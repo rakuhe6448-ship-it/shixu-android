@@ -1,0 +1,9 @@
+
+cn.shixu.app.DraftRepositoryIntegrationTest:..
+cn.shixu.app.AppSmokeTest:.
+
+Time: 4.947
+
+OK (3 tests)
+
+

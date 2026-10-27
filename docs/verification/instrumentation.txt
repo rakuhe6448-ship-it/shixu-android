@@ -1,0 +1,13 @@
+
+cn.shixu.app.AppSmokeTest:..
+cn.shixu.app.BackupIntegrationTest:..
+cn.shixu.app.ReminderIntegrationTest:..
+cn.shixu.app.RepositoryIntegrationTest:........
+cn.shixu.app.RuntimeIntegrationTest:..
+cn.shixu.app.WidgetIntegrationTest:.
+
+Time: 38.52
+
+OK (17 tests)
+
+

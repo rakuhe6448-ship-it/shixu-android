@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite name="cn.shixu.app.ApiProtocolTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T10:42:55" hostname="DESKTOP-2B9KE87" time="1.507">
+    <properties />
+    <testcase name="modelRequestUsesAuthenticatedGetAndExpectedPath" classname="cn.shixu.app.ApiProtocolTest" time="0.253" />
+    <testcase name="genericIsBlankAndLegacyPresetMigratesWithoutBrandingPersona" classname="cn.shixu.app.ApiProtocolTest" time="0.004" />
+    <testcase name="endpointsPreserveVersionAndAcceptFullChatUrl" classname="cn.shixu.app.ApiProtocolTest" time="0.002" />
+    <testcase name="modelsAreValidatedDeduplicatedAndSorted" classname="cn.shixu.app.ApiProtocolTest" time="0.002" />
+    <testcase name="unsupportedListHasManualFallbackAndRateLimitRetriesOnlyOnce" classname="cn.shixu.app.ApiProtocolTest" time="1.244" />
+    <system-out><![CDATA[]]></system-out>
+    <system-err><![CDATA[]]></system-err>
+  </testsuite>
+  <testsuite name="cn.shixu.app.CoreRulesTest" tests="27" skipped="0" failures="0" errors="0" timestamp="2026-10-27T10:42:56" hostname="DESKTOP-2B9KE87" time="0.04">
+    <properties />
+    <testcase name="unseenTargetIsRejected" classname="cn.shixu.app.CoreRulesTest" time="0.009" />
+    <testcase name="explicitlyEmptyRemindersDisablesDefault" classname="cn.shixu.app.CoreRulesTest" time="0.007" />
+    <testcase name="duplicateTargetInOneBatchIsRejected" classname="cn.shixu.app.CoreRulesTest" time="0.002" />
+    <testcase name="sameLaneNeverOverlaps" classname="cn.shixu.app.CoreRulesTest" time="0.01" />
+    <testcase name="injectedSystemFieldsAreRejected" classname="cn.shixu.app.CoreRulesTest" time="0.001" />
+    <testcase name="staleModelVersionIsRejected" classname="cn.shixu.app.CoreRulesTest" time="0.001" />
+    <testcase name="duplicateRemindersAreRejected" classname="cn.shixu.app.CoreRulesTest" time="0.001" />
+    <testcase name="newRepeatingReminderSkipsHistoricalBurst" classname="cn.shixu.app.CoreRulesTest" time="0.001" />
+    <testcase name="ambiguousResponseNeverContainsExecutableProposal" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <testcase name="explicitReminderOverridesDefault" classname="cn.shixu.app.CoreRulesTest" time="0.001" />
+    <testcase name="deadlineOnlyDoesNotOccupyEarlierDays" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <testcase name="missedOneShotCatchesUpOnce" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <testcase name="calendarHandlesSixRowsAndContinuousBars" classname="cn.shixu.app.CoreRulesTest" time="0.001" />
+    <testcase name="overdueTaskRemainsActiveAndVisibleAtItsDate" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <testcase name="pastDefaultIsNotInventedAtAnotherTime" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <testcase name="postponedDeadlineMovesRelativeButPreservesAbsoluteReminder" classname="cn.shixu.app.CoreRulesTest" time="0.002" />
+    <testcase name="leapYearRecurrenceReturnsToFebruary29" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <testcase name="pendingOccurrenceSurvivesProcessStartAfterAlarmTime" classname="cn.shixu.app.CoreRulesTest" time="0.001" />
+    <testcase name="quotedTargetCannotBeReplacedByAnotherTask" classname="cn.shixu.app.CoreRulesTest" time="0.001" />
+    <testcase name="remindersMustHaveCorrectForeignKey" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <testcase name="defaultReminderIsPreviousDayAtNine" classname="cn.shixu.app.CoreRulesTest" time="0.001" />
+    <testcase name="jsonCodeFenceIsTolerated" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <testcase name="completedTasksAreRemovedFromCalendar" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <testcase name="completionCannotAlsoEditTitle" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <testcase name="startAfterDueIsRejected" classname="cn.shixu.app.CoreRulesTest" time="0.001" />
+    <testcase name="deliveredOneShotDoesNotRepeatOnReboot" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <testcase name="monthlyRepeatKeepsTheOriginalDay" classname="cn.shixu.app.CoreRulesTest" time="0.0" />
+    <system-out><![CDATA[]]></system-out>
+    <system-err><![CDATA[]]></system-err>
+  </testsuite>
+  <testsuite name="cn.shixu.app.DraftEngineTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-27T10:42:56" hostname="DESKTOP-2B9KE87" time="0.014">
+    <properties />
+    <testcase name="newPartialDraftCannotPassFormalValidation" classname="cn.shixu.app.DraftEngineTest" time="0.004" />
+    <testcase name="missingPatchPreservesAndClearIsExplicit" classname="cn.shixu.app.DraftEngineTest" time="0.002" />
+    <testcase name="invalidReminderIdsAndMixedTimeDefinitionsAreRejected" classname="cn.shixu.app.DraftEngineTest" time="0.0" />
+    <testcase name="nullableUnknownStartStillAsksInsteadOfTreatingItAsUserOptOut" classname="cn.shixu.app.DraftEngineTest" time="0.001" />
+    <testcase name="firstExplicitGroupReplacesAutoButKeepsUserAndUnknown" classname="cn.shixu.app.DraftEngineTest" time="0.003" />
+    <testcase name="quoteCannotCreateASeparateTaskOrAddressUnknownTarget" classname="cn.shixu.app.DraftEngineTest" time="0.001" />
+    <testcase name="titleOnlyDraftGetsOneDefaultWhenDeadlineIsAddedLater" classname="cn.shixu.app.DraftEngineTest" time="0.001" />
+    <testcase name="explicitTimeMatchingAutoAdoptsTheSameId" classname="cn.shixu.app.DraftEngineTest" time="0.001" />
+    <testcase name="appendPreservesExistingIdsAndDoesNotReplayDeliveredReminder" classname="cn.shixu.app.DraftEngineTest" time="0.0" />
+    <system-out><![CDATA[]]></system-out>
+    <system-err><![CDATA[]]></system-err>
+  </testsuite>
+  <testsuite name="cn.shixu.app.PlanningChoicesTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-27T10:42:56" hostname="DESKTOP-2B9KE87" time="0.013">
+    <properties />
+    <testcase name="ongoingTaskOffersChoiceWithoutInventingStartDate" classname="cn.shixu.app.PlanningChoicesTest" time="0.002" />
+    <testcase name="missingAdviceFallsBackAndUserCategoryWins" classname="cn.shixu.app.PlanningChoicesTest" time="0.002" />
+    <testcase name="invalidChoiceAndUnknownTargetCannotBeSaved" classname="cn.shixu.app.PlanningChoicesTest" time="0.002" />
+    <testcase name="deadlineOnlyChoiceAndExplicitStartAreRespected" classname="cn.shixu.app.PlanningChoicesTest" time="0.003" />
+    <testcase name="selectedStartProducesContinuousCalendarAndKeepsReminder" classname="cn.shixu.app.PlanningChoicesTest" time="0.0" />
+    <testcase name="ordinaryPostponementKeepsCategoryAndDoesNotAskForStart" classname="cn.shixu.app.PlanningChoicesTest" time="0.004" />
+    <system-out><![CDATA[]]></system-out>
+    <system-err><![CDATA[]]></system-err>
+  </testsuite>
+</testsuites>

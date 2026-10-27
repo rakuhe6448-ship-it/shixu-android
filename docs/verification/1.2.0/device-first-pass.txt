@@ -1,0 +1,60 @@
+
+cn.shixu.app.DraftRepositoryIntegrationTest:......
+cn.shixu.app.DraftMigrationTest:
+Error in actualVersionOneDatabaseMigratesWithoutChangingIdsOrDeliveryState(cn.shixu.app.DraftMigrationTest):
+org.json.JSONException: No value for indices
+	at org.json.JSONObject.get(JSONObject.java:398)
+	at org.json.JSONObject.getJSONArray(JSONObject.java:593)
+	at cn.shixu.app.DraftMigrationTest$actualVersionOneDatabaseMigratesWithoutChangingIdsOrDeliveryState$1$helper$1.onCreate(DraftMigrationTest.kt:26)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.onCreate(FrameworkSQLiteOpenHelper.android.kt:236)
+	at android.database.sqlite.SQLiteOpenHelper.getDatabaseLocked(SQLiteOpenHelper.java:410)
+	at android.database.sqlite.SQLiteOpenHelper.getWritableDatabase(SQLiteOpenHelper.java:316)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getWritableOrReadableDatabase(FrameworkSQLiteOpenHelper.android.kt:224)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.innerGetDatabase(FrameworkSQLiteOpenHelper.android.kt:180)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getSupportDatabase(FrameworkSQLiteOpenHelper.android.kt:141)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper.getWritableDatabase(FrameworkSQLiteOpenHelper.android.kt:96)
+	at cn.shixu.app.DraftMigrationTest$actualVersionOneDatabaseMigratesWithoutChangingIdsOrDeliveryState$1.invokeSuspend(DraftMigrationTest.kt:36)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source:1)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source:1)
+	at cn.shixu.app.DraftMigrationTest.actualVersionOneDatabaseMigratesWithoutChangingIdsOrDeliveryState(DraftMigrationTest.kt:16)
+
+cn.shixu.app.BackupIntegrationTest:...
+cn.shixu.app.RepositoryIntegrationTest:........
+cn.shixu.app.AppSmokeTest:.
+cn.shixu.app.RuntimeIntegrationTest:.
+
+Time: 14.877
+There was 1 failure:
+1) actualVersionOneDatabaseMigratesWithoutChangingIdsOrDeliveryState(cn.shixu.app.DraftMigrationTest)
+org.json.JSONException: No value for indices
+	at org.json.JSONObject.get(JSONObject.java:398)
+	at org.json.JSONObject.getJSONArray(JSONObject.java:593)
+	at cn.shixu.app.DraftMigrationTest$actualVersionOneDatabaseMigratesWithoutChangingIdsOrDeliveryState$1$helper$1.onCreate(DraftMigrationTest.kt:26)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.onCreate(FrameworkSQLiteOpenHelper.android.kt:236)
+	at android.database.sqlite.SQLiteOpenHelper.getDatabaseLocked(SQLiteOpenHelper.java:410)
+	at android.database.sqlite.SQLiteOpenHelper.getWritableDatabase(SQLiteOpenHelper.java:316)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getWritableOrReadableDatabase(FrameworkSQLiteOpenHelper.android.kt:224)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.innerGetDatabase(FrameworkSQLiteOpenHelper.android.kt:180)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getSupportDatabase(FrameworkSQLiteOpenHelper.android.kt:141)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper.getWritableDatabase(FrameworkSQLiteOpenHelper.android.kt:96)
+	at cn.shixu.app.DraftMigrationTest$actualVersionOneDatabaseMigratesWithoutChangingIdsOrDeliveryState$1.invokeSuspend(DraftMigrationTest.kt:36)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source:1)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source:1)
+	at cn.shixu.app.DraftMigrationTest.actualVersionOneDatabaseMigratesWithoutChangingIdsOrDeliveryState(DraftMigrationTest.kt:16)
+
+FAILURES!!!
+Tests run: 20,  Failures: 1
+
+

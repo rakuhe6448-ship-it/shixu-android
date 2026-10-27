@@ -1,0 +1,8 @@
+
+cn.shixu.app.DraftMigrationTest:.
+
+Time: 0.079
+
+OK (1 test)
+
+
