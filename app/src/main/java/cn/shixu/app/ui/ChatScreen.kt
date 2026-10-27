@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.shixu.app.PlannerViewModel
 import cn.shixu.app.ai.Attachments
+import cn.shixu.app.ai.PhoneAlarm
 import cn.shixu.app.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -144,6 +145,7 @@ fun AttachmentImage(name: String,modifier: Modifier=Modifier) {
 }
 @Composable
 private fun ProposalCard(vm: PlannerViewModel,message: MessageEntity) {
+    if(PhoneAlarm.isProposal(message.proposal)) { PhoneAlarmCard(vm,message);return }
     val operations=remember(message.proposal) { runCatching { JSONObject(message.proposal!!).getJSONArray("operations").objects() }.getOrDefault(emptyList()) }
     Surface(modifier=Modifier.padding(top=8.dp).fillMaxWidth(),shape=RoundedCornerShape(18.dp),color=MaterialTheme.colorScheme.surfaceContainerLow,border=BorderStroke(1.dp,MaterialTheme.colorScheme.primary.copy(alpha=.25f))) {
         Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -177,6 +179,36 @@ private fun ProposalCard(vm: PlannerViewModel,message: MessageEntity) {
                     TextButton(onClick={vm.quote(message)}) { Text("引用补充") }
                     TextButton(onClick={vm.dismissProposal(message.id)}) { Text("取消") }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhoneAlarmCard(vm: PlannerViewModel,message: MessageEntity) {
+    val context=LocalContext.current
+    val alarm=remember(message.proposal) { runCatching { PhoneAlarm.fromProposal(message.proposal!!) }.getOrNull() }
+    Surface(modifier=Modifier.padding(top=8.dp).fillMaxWidth(),shape=RoundedCornerShape(18.dp),color=MaterialTheme.colorScheme.surfaceContainerLow,border=BorderStroke(1.dp,MaterialTheme.colorScheme.primary.copy(alpha=.25f))) {
+        Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            Text(when(message.state) {
+                "APPLIED" -> "已交给手机时钟"
+                "DISMISSED" -> "这条闹钟建议已取消"
+                "SUPERSEDED" -> "请查看最新闹钟卡片"
+                "WAITING_INPUT" -> "手机闹钟 · 待补充"
+                else -> "待确认的手机闹钟"
+            },style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.primary)
+            alarm?.let {
+                Text(it.label,style=MaterialTheme.typography.titleMedium)
+                Text(it.description(),style=MaterialTheme.typography.bodyLarge)
+            }
+            Text("由手机时钟响铃。请在时钟中核对并启用，后续修改或关闭也在手机时钟中操作。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                if(message.state in setOf("PENDING","WAITING_INPUT")) {
+                    if(alarm!=null && message.state=="PENDING") Button(onClick={vm.openPhoneAlarm(message,context)},enabled=!vm.proposalSaving) { Text("确认并打开手机时钟") }
+                    TextButton(onClick={vm.quote(message)}) { Text("引用补充") }
+                    TextButton(onClick={vm.dismissProposal(message.id)}) { Text("取消建议") }
+                }
+                TextButton(onClick={vm.showPhoneClock(context)}) { Text("打开手机时钟") }
             }
         }
     }

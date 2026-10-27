@@ -24,6 +24,19 @@ class AppSmokeTest {
         compose.runOnIdle { val vm=ViewModelProvider(compose.activity)[PlannerViewModel::class.java]; vm.page=0;vm.detailsId=null;vm.editor=null;vm.startDateMessage=null;vm.finishPermissionIntro(manualOnly=true) }
         compose.waitUntil(10000) { ViewModelProvider(compose.activity)[PlannerViewModel::class.java].permissionIntroComplete }
     }
+    @Test fun phoneAlarmCardHandsOffToInstalledClock() {
+        val answer=runBlocking {
+            val repo=app.repository
+            val source=MessageEntity(role="user",text="设置7点31分手机闹钟");repo.putMessage(source)
+            val raw=JSONObject().put("protocolVersion",2).put("operations",JSONArray().put(JSONObject().put("action","SET_ALARM").put("alarm",JSONObject().put("time","07:31").put("label","时序联调测试"))))
+            repo.acceptAiResult(raw,source.id,repo.conversationContext(source),"")
+        }
+        compose.onNodeWithText("AI 聊天",useUnmergedTree=true).performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("确认并打开手机时钟").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("确认并打开手机时钟").performClick()
+        compose.waitUntil(10000) { runBlocking { app.repository.dao.message(answer.id)?.state=="APPLIED" } }
+        assertTrue(runBlocking { app.repository.dao.tasks().isEmpty() && app.repository.dao.reminders().isEmpty() })
+    }
     @Test fun manualCreateCompleteAndRestoreThroughRealUi() {
         compose.onNodeWithText("新建事项",useUnmergedTree=true).performClick()
         compose.onNodeWithText("想安排什么？").performTextInput("手动流程验收")

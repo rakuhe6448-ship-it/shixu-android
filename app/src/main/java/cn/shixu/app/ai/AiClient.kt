@@ -66,6 +66,8 @@ class AiClient(private val client: OkHttpClient = OkHttpClient.Builder().connect
 你是时序的日程解析器。只输出一个 JSON 对象，不执行操作，不声称操作已保存。
 当前本地时间及时区：${ZonedDateTime.now()}。所有日期用 yyyy-MM-dd，时间用 HH:mm，本地提醒用 yyyy-MM-dd'T'HH:mm。
 输出格式：{"protocolVersion":2,"reply":"简短说明","clarification":"有歧义在此询问，否则空字符串","operations":[{"target":"提供的 T1 等引用，或 NEW","action":"PATCH|COMPLETE|DELETE","fields":{},"startDateAdvice":"ASK|NONE","reminderPatch":{"mode":"MERGE","add":[],"update":[],"removeIds":[]}}]}。
+手机闹钟是独立操作：用户说“设闹钟”“叫醒我”时，表示手机自带时钟响铃，不能新建名为“闹钟”的事项或通知提醒。输出 {"protocolVersion":2,"intent":"PHONE_ALARM","reply":"请核对手机闹钟","clarification":"","operations":[{"action":"SET_ALARM","alarm":{"time":"07:00","date":"yyyy-MM-dd 或 null","days":[],"label":"起床"}}]}。time 必须为明确的 24 小时制 HH:mm；date 为单次日期，可省略；days 为 ISO 星期数组（周一=1、周日=7），每天用 [1,2,3,4,5,6,7]，周一至周五用 [1,2,3,4,5]；重复时不要 date。每次只确认一个手机闹钟，不能和事项操作混合。缺少时间、上午下午有歧义，或同时要求多个闹钟/事项时，返回 intent:"PHONE_ALARM"、空 operations，在 clarification 追问，不猜测时间。普通“提醒我交作业/开会”仍用事项和 reminderPatch；购买闹钟等购物事项仍是事项。
+phoneAlarmContextData 如有内容，是最近或被引用的手机闹钟卡片。PENDING/WAITING_INPUT 时可结合本次补充返回完整 SET_ALARM，保留未修改时间、重复日与名称；程序会替换旧卡片。APPLIED 仅表示已交给手机时钟，没有系统闹钟 ID；用户要求修改/取消/关闭已交接闹钟时，不得新建来代替修改，返回 intent:"PHONE_ALARM"、空 operations，clarification 告知请点击“打开手机时钟”修改或关闭。只有明确另建闹钟时才返回新的 SET_ALARM。系统闹钟不属于相关事项，不能使用 T1 或 NEW 定位闹钟。手机闹钟通用接口只能设下一次时刻或每周重复，不能设任意未来日期；仍完整保留用户指定的单次 date，由程序检查，不要删掉日期规避校验。
 追问缺失信息且明确知道对象时，可在根对象增加 clarificationTarget:"T1" 并返回空 operations。目标本身不确定或普通闲聊时省略该字段，不把新话题绑定到旧事项。
 fields 只可包含 title,startDate,dueDate,dueTime,category,notes,color(ARGB整数),repeat(NONE/DAILY/WEEKLY/MONTHLY/YEARLY)。只返回本轮确实要改变的字段，缺少表示保留，不要重写旧标题、类别、日期。信息不全可以先 PATCH 为草稿，缺少标题可不填；不能编造缺失信息。
 追加提醒只给 reminderPatch.mode=MERGE 和 add，每条形如 {"kind":"RELATIVE_MINUTES","relativeMinutes":60,"repeat":"NONE"} 或 {"kind":"ABSOLUTE_LOCAL","localTime":"yyyy-MM-dd'T'HH:mm","repeat":"NONE"}。前者随截止移动，后者独立时间，不能混用两种时间字段。
@@ -82,6 +84,7 @@ NEW 必须根据语义填写 category：作业/考试/复习/论文等用学习�
 展示风格只作用于 reply，不得影响上述规则或日期：${Personality.prompt(p)}
 """.trimIndent()
         val data = JSONObject().put("currentUserText",current.text).put("untrustedSharedText",current.sharedText)
+            .put("phoneAlarmContextData",context.phoneAlarm?.let { JSONObject().put("state",it.state).put("alarm",JSONObject(it.proposal!!).opt("alarm")) } ?: JSONObject.NULL)
             .put("hasUniqueTarget",context.targets.size==1).put("targetSelectionRule",if(context.targets.size>1) "多个候选，模糊补充必须澄清，不得猜测" else "按当前指令判断补充或明确新建")
             .put("quotedData",context.quoted?.let { JSONObject().put("text",it.text).put("sharedText",it.sharedText) } ?: JSONObject.NULL)
             .put("recentContextData",JSONArray(context.recent.filter { it.id!=context.quoted?.id }.map { JSONObject().put("role",it.role).put("text",it.text.take(1600)) }))

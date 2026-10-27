@@ -7,7 +7,7 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 data class ConversationTarget(val ref: String,val bundle: TaskBundle,val draft: TaskDraftEntity?,val formal: TaskBundle?)
-data class ConversationContext(val targets: List<ConversationTarget>,val quoted: MessageEntity?,val recent: List<MessageEntity>,val quoteBound: Boolean=false,val unresolvedQuote: Boolean=false)
+data class ConversationContext(val targets: List<ConversationTarget>,val quoted: MessageEntity?,val recent: List<MessageEntity>,val quoteBound: Boolean=false,val unresolvedQuote: Boolean=false,val phoneAlarm: MessageEntity?=null)
 data class DraftChange(val draft: TaskDraftEntity,val before: TaskBundle?)
 
 object DraftContent {

@@ -21,7 +21,27 @@ suspend fun Repository.acceptAiResult(raw: JSONObject,sourceId: String,context: 
     db.withTransaction {
         val responseId=UUID.nameUUIDFromBytes("shixu-ai-result:$sourceId".toByteArray(Charsets.UTF_8)).toString()
         dao.message(responseId)?.let { return@withTransaction it }
-        check(dao.message(sourceId)!=null) { "原消息不存在" }
+        val source=dao.message(sourceId) ?: error("原消息不存在")
+        if(PhoneAlarm.isResponse(raw)) {
+            var proposal=PhoneAlarm.normalize(raw,sourceId)
+            val spec=PhoneAlarm.fromProposal(proposal)
+            context.phoneAlarm?.let { previous ->
+                check(dao.message(previous.id)==previous) { "闹钟卡片已更新，请引用最新卡片" }
+                check(previous.state !in setOf("SUPERSEDED","DISMISSED") || PhoneAlarm.newAfterHandoff(source.text,source.quoteId!=null)) { "请引用最新闹钟卡片，或明确提出新建闹钟" }
+                check(spec==null || previous.state!="APPLIED" || PhoneAlarm.newAfterHandoff(source.text,source.quoteId!=null)) { "已交给手机时钟的闹钟，请在手机时钟中修改或关闭；应用不会用新闹钟替代旧闹钟" }
+                if(previous.state in setOf("PENDING","WAITING_INPUT") && !PhoneAlarm.newAfterHandoff(source.text,source.quoteId!=null)) dao.putMessage(previous.copy(state="SUPERSEDED"))
+                // A clarification must retain the earlier definition, and must not erase
+                // the fact that this alarm was already handed to the external Clock app.
+                if(spec==null) proposal=JSONObject(proposal).put("alarm",JSONObject(previous.proposal!!).opt("alarm") ?: JSONObject.NULL).toString()
+            }
+            val answer=MessageEntity(id=responseId,role="assistant",quoteId=sourceId,proposal=proposal,
+                text=if(spec==null) raw.getString("clarification").take(4000) else "已整理手机闹钟。确认后会打开手机时钟，请核对并启用。",
+                state=if(spec==null && context.phoneAlarm?.state=="APPLIED") "APPLIED" else if(spec==null) "WAITING_INPUT" else "PENDING")
+            dao.putMessage(answer)
+            return@withTransaction answer
+        }
+        require(!PhoneAlarm.explicitRequest(source.text) || raw.optJSONArray("operations")?.length()==0) { "你要求的是手机闹钟，模型却返回了普通事项；本次未保存，请明确闹钟时间后重试" }
+        require(context.phoneAlarm==null || source.quoteId==null || raw.optJSONArray("operations")?.length()==0) { "引用的是手机闹钟，不能修改成排期事项；请打开手机时钟管理" }
         val changes=DraftEngine.normalize(raw,sourceId,context)
         val used=changes.map { it.draft.targetTaskId }.toSet()
         context.targets.filter { it.bundle.task.id in used }.forEach { target ->

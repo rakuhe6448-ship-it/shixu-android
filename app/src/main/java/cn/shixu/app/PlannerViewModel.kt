@@ -1,6 +1,8 @@
 package cn.shixu.app
 
 import android.app.Application
+import android.content.ActivityNotFoundException
+import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.*
 import androidx.lifecycle.AndroidViewModel
@@ -8,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import cn.shixu.app.ai.*
 import cn.shixu.app.data.*
 import cn.shixu.app.widgets.WidgetRenderer
+import cn.shixu.app.reminders.SystemClock
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -167,6 +170,21 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         proposalError=null
         if(message.proposal!=null && cn.shixu.app.ai.ProposalChoices.pending(message.proposal).isNotEmpty()) startDateMessage=message
         else applyProposal(message.id)
+    }
+    fun openPhoneAlarm(message: MessageEntity,context: Context) {
+        if(proposalSaving) return
+        proposalSaving=true
+        operation { try {
+            repo.handoffPhoneAlarm(message.id) { context.startActivity(SystemClock.createIntent(it)) }
+            notify("已打开手机时钟，请核对闹钟是否启用")
+        } catch(_: ActivityNotFoundException) { notify("没有找到支持设置闹钟的手机时钟应用，请安装或启用系统时钟")
+        } catch(_: SecurityException) { notify("手机系统拒绝设置闹钟，请在手机时钟中手动设置")
+        } finally { proposalSaving=false } }
+    }
+    fun showPhoneClock(context: Context) {
+        try { context.startActivity(SystemClock.showIntent()) }
+        catch(_: ActivityNotFoundException) { notify("没有找到支持此入口的手机时钟应用，请从桌面打开时钟") }
+        catch(_: SecurityException) { notify("手机系统拒绝打开时钟，请从桌面打开时钟") }
     }
     fun applyProposal(id: String, startDates: Map<String,String?> = emptyMap()) {
         if(proposalSaving) return

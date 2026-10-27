@@ -1,0 +1,6 @@
+cn.shixu.app.PhoneAlarmIntegrationTest:.....
+cn.shixu.app.AppSmokeTest:.
+
+Time: 57.16
+
+OK (6 tests)

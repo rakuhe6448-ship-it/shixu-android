@@ -2,7 +2,7 @@
 
 Kotlin / Jetpack Compose / Room。Android 8.0（API 26）及以上，无开发者服务器。手动排期、提醒、桌面组件和备份均可离线使用。
 
-[下载 1.2.0 APK](https://github.com/rakuhe6448-ship-it/shixu-android/releases/download/v1.2.0/ShiXu-1.2.0-debug.apk) · [查看发布版本](https://github.com/rakuhe6448-ship-it/shixu-android/releases)
+[下载 1.2.1 APK](https://github.com/rakuhe6448-ship-it/shixu-android/releases/download/v1.2.1/ShiXu-1.2.1-debug.apk) · [查看发布版本](https://github.com/rakuhe6448-ship-it/shixu-android/releases)
 
 ## 打开与构建
 
@@ -16,7 +16,9 @@ Windows 路径含中文时，可使用 `scripts/build.ps1`。它会临时映射�
 
 APK 的标准输出位置为 `app/build/outputs/apk/debug/app-debug.apk`。这是 Android 调试签名的可安装测试包。正式上架时，使用自己的长期签名密钥生成 release 包；项目不包含发布密钥、API Key 或开发者后端。
 
-交付包位于 `releases/`：`ShiXu-1.2.0-debug.apk`、`ShiXu-1.2.0-source.zip` 和 `SHA256SUMS.txt`。将 APK 传到 Android 8.0 及以上手机，使用文件管理器打开安装；系统询问时为该文件管理器允许安装应用。首次进入先显示通知和精确提醒权限引导，返回系统设置后自动检查；也可明确选择“暂时只用排期”，以后在设置中重新检查。需要 AI 时，再填写自己的服务地址、模型和 Key。安装包不预填示例任务。
+交付包位于 `releases/`：`ShiXu-1.2.1-debug.apk`、`ShiXu-1.2.1-source.zip` 和 `SHA256SUMS.txt`。将 APK 传到 Android 8.0 及以上手机，使用文件管理器打开安装；系统询问时为该文件管理器允许安装应用。首次进入先显示通知和精确提醒权限引导，返回系统设置后自动检查；也可明确选择“暂时只用排期”，以后在设置中重新检查。需要 AI 时，再填写自己的服务地址、模型和 Key。安装包不预填示例任务。
+
+**手机闹钟（1.2.1）**：在 AI 聊天发送“明早 7 点设闹钟”或“工作日 6 点半叫醒我”，核对独立的手机闹钟卡片，再点“确认并打开手机时钟”，在手机时钟中核对并启用。它使用系统 Clock 接口，不写成排期事项，也不使用通知代替响铃。待确认卡片支持引用补充；已交给时钟的闹钟须在时钟中修改、关闭。应用无法读取手机时钟的最终保存结果，因此只显示“已交给手机时钟”。系统通用接口支持下一次响铃及每周重复；任意未来日期和过期卡片会被拦截，请使用卡片的“打开手机时钟”手动设置。未指定时刻先询问；“提醒我买闹钟”仍是购物事项。
 
 ## 功能与使用
 
@@ -58,6 +60,7 @@ Android 强行停止应用后不会继续运行它的闹钟和开机恢复代码
 - [多轮草稿数据契约](docs/AI_DRAFT_CONTRACT.md)
 - [验收操作清单](docs/ACCEPTANCE.md)
 - [1.2.0 本次构建和定向验收](docs/VALIDATION-1.2.0.md)
+- [1.2.1 手机闹钟与定向验收](docs/VALIDATION-1.2.1.md)
 - [1.0.0 历史验收记录](docs/VALIDATION.md)
 - 单元测试：`app/src/test/java/cn/shixu/app/CoreRulesTest.kt`
 - Room 集成测试：`app/src/androidTest/java/cn/shixu/app/RepositoryIntegrationTest.kt`

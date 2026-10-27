@@ -1,0 +1,8 @@
+cn.shixu.app.PhoneAlarmIntegrationTest:.....
+cn.shixu.app.DraftRepositoryIntegrationTest:......
+cn.shixu.app.BackupIntegrationTest:.
+cn.shixu.app.AppSmokeTest:.
+
+Time: 14.585
+
+OK (13 tests)

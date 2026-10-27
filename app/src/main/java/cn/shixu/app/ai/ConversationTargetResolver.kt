@@ -7,6 +7,20 @@ object ConversationTargetResolver {
         val dao=repo.dao
         val messages=dao.messages().filter { it.id!=current.id }
         val quoted=current.quoteId?.let { dao.message(it) }
+        // Clock requests have no task IDs. Keep their context separate from the planner.
+        fun alarmFor(message: MessageEntity): MessageEntity? = if(PhoneAlarm.isProposal(message.proposal)) message else
+            messages.lastOrNull { it.quoteId==message.id && PhoneAlarm.isProposal(it.proposal) }
+        var alarm=if(quoted!=null) alarmFor(quoted) else messages.lastOrNull()?.let(::alarmFor)
+        if(quoted!=null && alarm==null) {
+            var node: MessageEntity=quoted;val visited=mutableSetOf<String>()
+            repeat(16) {
+                if(alarm==null && visited.add(node.id)) {
+                    val parent=node.quoteId?.let { id -> messages.find { it.id==id } }
+                    if(parent!=null) { node=parent;alarm=alarmFor(parent) }
+                }
+            }
+        }
+        if(alarm!=null) return ConversationContext(emptyList(),quoted,listOfNotNull(alarm),phoneAlarm=alarm)
         suspend fun direct(message: MessageEntity): Set<String> =
             (dao.draftsForMessage(message.id).mapNotNull { dao.draft(it.draftId)?.targetTaskId }+dao.linksFor(message.id).map { it.taskId }).toSet()
         var ids=emptySet<String>()

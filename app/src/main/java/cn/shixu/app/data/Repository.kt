@@ -110,6 +110,7 @@ class Repository(val db: PlannerDatabase) {
         try { gate.withLock { db.withTransaction {
             val message = dao.message(messageId) ?: error("消息不存在")
             check(message.state == "PENDING") { "这条建议已处理，请勿重复提交" }
+            check(!cn.shixu.app.ai.PhoneAlarm.isProposal(message.proposal)) { "手机闹钟需要打开手机时钟，不能保存到排期" }
             val resolved = cn.shixu.app.ai.ProposalChoices.resolve(message.proposal ?: error("缺少操作数据"),startDates)
             val envelope = JSONObject(resolved)
             checkProposalDrafts(envelope)

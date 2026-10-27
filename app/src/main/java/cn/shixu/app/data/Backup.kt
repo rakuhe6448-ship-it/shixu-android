@@ -7,6 +7,7 @@ import androidx.room.withTransaction
 import cn.shixu.app.ShiXuApp
 import cn.shixu.app.ai.Attachments
 import cn.shixu.app.ai.DraftContent
+import cn.shixu.app.ai.PhoneAlarm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -71,6 +72,11 @@ class Backup(private val app: ShiXuApp) {
             require(it.role in setOf("user","assistant") && it.text.length<=60000 && it.sharedText.length<=12000 && it.state in setOf("SENT","PENDING","APPLIED","DISMISSED","ERROR","WAITING_INPUT","SUPERSEDED","CONFLICT")) { "聊天记录格式错误" }
             require(it.quoteId==null || it.quoteId in messageIds) { "引用消息缺失" }
             it.proposal?.let { proposal ->
+                if(PhoneAlarm.isProposal(proposal)) {
+                    PhoneAlarm.fromProposal(proposal)
+                    require(JSONObject(proposal).getString("sourceId") in messageIds) { "闹钟原消息缺失" }
+                    return@let
+                }
                 val ops=JSONObject(proposal).getJSONArray("operations")
                 require(ops.length()<=10)
                 ops.objects().forEach { op ->

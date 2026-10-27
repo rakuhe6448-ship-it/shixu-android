@@ -81,4 +81,16 @@ class BackupIntegrationTest {
         repo.applyProposal(renewed.id)
         assertEquals(1,repo.dao.tasks().size)
     }
+    @Test fun phoneAlarmBackupRestoresHistoryAndNeverReplaysClockActions() = runBlocking {
+        val repo=app.repository
+        val source=MessageEntity(role="user",text="设置7点手机闹钟");repo.putMessage(source)
+        val raw=JSONObject().put("protocolVersion",2).put("operations",JSONArray().put(JSONObject().put("action","SET_ALARM").put("alarm",JSONObject().put("time","07:00"))))
+        val answer=repo.acceptAiResult(raw,source.id,repo.conversationContext(source),"")
+        val backup=Backup(app);val uri=Uri.fromFile(File(app.cacheDir,"clock-roundtrip.json"))
+        backup.export(uri);backup.restore(backup.read(uri))
+        assertEquals("DISMISSED",repo.dao.message(answer.id)!!.state)
+        assertEquals("07:00",cn.shixu.app.ai.PhoneAlarm.fromProposal(repo.dao.message(answer.id)!!.proposal!!)!!.time)
+        try { repo.handoffPhoneAlarm(answer.id) { fail("Imported clock action executed") };fail("Imported action accepted") } catch(_: IllegalStateException) { }
+        assertTrue(repo.dao.tasks().isEmpty());assertTrue(repo.dao.reminders().isEmpty())
+    }
 }

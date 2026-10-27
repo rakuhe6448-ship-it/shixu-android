@@ -1,0 +1,5 @@
+﻿cn.shixu.app.ApiProtocolTest: tests=5, failures=0, errors=0
+cn.shixu.app.CoreRulesTest: tests=27, failures=0, errors=0
+cn.shixu.app.DraftEngineTest: tests=9, failures=0, errors=0
+cn.shixu.app.PhoneAlarmTest: tests=6, failures=0, errors=0
+cn.shixu.app.PlanningChoicesTest: tests=6, failures=0, errors=0
