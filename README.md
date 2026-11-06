@@ -60,6 +60,7 @@ Android 强行停止应用后不会继续运行它的闹钟和开机恢复代码
 
 ## 开发与验证资料
 
+- [AI 首读与持续维护报告](AGENTS.md)：当前进度、关键历史、文件定位、验证边界；每完成一段工作更新。
 - [数据与安全设计](docs/ARCHITECTURE.md)
 - [多轮草稿数据契约](docs/AI_DRAFT_CONTRACT.md)
 - [1.3.0 追问草稿与提醒意图契约](docs/AI_INTAKE-1.3.0.md)

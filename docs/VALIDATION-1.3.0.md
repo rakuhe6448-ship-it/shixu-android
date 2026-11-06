@@ -48,4 +48,4 @@ adb shell am instrument -w -e class cn.shixu.app.RuntimeIntegrationTest#explicit
 
 安装 `releases/ShiXu-1.3.0-debug.apk` 后，可发送“每隔三天提醒我面部清洁。每天晚上提醒我护肤。”，再引用追问回复“面部清洁改成每周，护肤只放待办，不提醒”。护肤应可单独确认保存，清洁仍询问具体通知日期和时刻。另可在月历网格左右滑动，确认日期点击与上下滚动可用。
 
-APK 与源码包由 `scripts/package.ps1` 生成，校验值位于 `releases/SHA256SUMS.txt`。本轮保留未提交的源码差异，供 VS Code 源代码管理查看；未上传 GitHub 或创建发布。
+APK 与源码包由 `scripts/package.ps1` 生成，校验值位于 `releases/SHA256SUMS.txt`。2026-11-01 交付时保留未提交差异供 VS Code 查看；2026-11-06 按用户要求提交为 `095ff15`，并添加项目根目录的 `AGENTS.md` 作为持续维护报告。报告及源码归档更新不改变应用 APK，也未重新运行上述应用测试。尚未推送 GitHub 或创建发布。

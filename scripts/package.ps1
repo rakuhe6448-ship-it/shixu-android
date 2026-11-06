@@ -12,7 +12,7 @@ $zipPath = Join-Path $releaseRoot ('ShiXu-' + $version + '-source.zip')
 Copy-Item -LiteralPath $builtApk -Destination $apkPath -Force
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$rootFiles = @('.gitignore', '.gitattributes', 'README.md', 'build.gradle.kts', 'settings.gradle.kts', 'gradle.properties', 'gradlew', 'gradlew.bat', 'app\build.gradle.kts')
+$rootFiles = @('.gitignore', '.gitattributes', 'AGENTS.md', 'README.md', 'build.gradle.kts', 'settings.gradle.kts', 'gradle.properties', 'gradlew', 'gradlew.bat', 'app\build.gradle.kts')
 $files = @($rootFiles | ForEach-Object { Get-Item -LiteralPath (Join-Path $projectRoot $_) })
 foreach ($folder in @('app\src', 'app\schemas', 'gradle', 'docs', 'scripts')) {
     $files += Get-ChildItem -LiteralPath (Join-Path $projectRoot $folder) -File -Recurse
