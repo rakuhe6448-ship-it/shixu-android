@@ -8,6 +8,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -66,20 +72,20 @@ fun PlannerRoot(vm: PlannerViewModel) {
             return@ShiXuTheme
         }
         Scaffold(containerColor=MaterialTheme.colorScheme.background,snackbarHost={SnackbarHost(snackbar)},bottomBar={
-            NavigationBar(containerColor=MaterialTheme.colorScheme.surfaceContainerLow,tonalElevation=0.dp) {
+            NavigationBar(modifier=Modifier.border(BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)),containerColor=MaterialTheme.colorScheme.surfaceContainerLow,tonalElevation=0.dp) {
                 val labels=listOf("排期","待办","提醒","AI 聊天","设置")
                 val icons=listOf(Icons.Outlined.CalendarMonth,Icons.Outlined.Checklist,Icons.Outlined.NotificationsNone,Icons.Outlined.ChatBubbleOutline,Icons.Outlined.Tune)
-                labels.forEachIndexed { index,label -> NavigationBarItem(selected=vm.page==index,onClick={vm.page=index},icon={Icon(icons[index],label,Modifier.size(23.dp))},label={Text(label)}) }
+                labels.forEachIndexed { index,label -> NavigationBarItem(selected=vm.page==index,onClick={vm.page=index},icon={Icon(icons[index],label,Modifier.size(22.dp))},label={Text(label,style=MaterialTheme.typography.labelMedium)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primaryContainer,selectedIconColor=MaterialTheme.colorScheme.primary,selectedTextColor=MaterialTheme.colorScheme.primary)) }
             }
-        },floatingActionButton={if(vm.page in 0..2) ExtendedFloatingActionButton(onClick={vm.newTask()},icon={Icon(Icons.Outlined.Add,null)},text={Text("新建事项")},containerColor=MaterialTheme.colorScheme.primary,contentColor=MaterialTheme.colorScheme.onPrimary)}) { padding ->
+        },floatingActionButton={if(vm.page in 0..2) ExtendedFloatingActionButton(onClick={vm.newTask()},icon={Icon(Icons.Outlined.Add,null)},text={Text("新建事项")},shape=RoundedCornerShape(6.dp),containerColor=MaterialTheme.colorScheme.primary,contentColor=MaterialTheme.colorScheme.onPrimary)}) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
-                when(vm.page) {
+                Crossfade(targetState=vm.page,animationSpec=tween(180),label="navigation") { page -> when(page) {
                     0 -> CalendarScreen(vm,tasks)
                     1 -> TodoScreen(vm,tasks)
                     2 -> RemindersScreen(vm,tasks,reminders)
                     3 -> ChatScreen(vm,messages,tasks,links,p)
                     else -> SettingsScreen(vm,p)
-                }
+                } }
             }
         }
         vm.editor?.let { TaskEditor(vm,it) }

@@ -3,6 +3,7 @@ $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $releaseRoot = Join-Path $projectRoot 'releases'
 $builtApk = Join-Path $projectRoot 'app\build\outputs\apk\debug\app-debug.apk'
 if (-not (Test-Path -LiteralPath $builtApk)) { throw 'Build assembleDebug before packaging.' }
+& (Join-Path $PSScriptRoot 'check-widget-text.ps1') -ApkPath $builtApk
 New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
 $metadata = Get-Content -Raw -LiteralPath (Join-Path $projectRoot 'app\build\outputs\apk\debug\output-metadata.json') | ConvertFrom-Json
 $version = $metadata.elements[0].versionName

@@ -69,7 +69,7 @@ object DraftEngine {
         require(o.opt(key) is JSONArray) { "$key 必须是数组" }
         return o.getJSONArray(key).objects()
     }
-    fun normalize(raw: JSONObject,sourceId: String,context: ConversationContext,now: LocalDateTime=LocalDateTime.now()): List<DraftChange> {
+    fun normalize(raw: JSONObject,sourceId: String,context: ConversationContext,now: LocalDateTime=LocalDateTime.now(),paletteTasks: List<TaskEntity> = emptyList()): List<DraftChange> {
         checkKeys(raw,setOf("protocolVersion","reply","clarification","clarificationTarget","clarificationTargets","operations"))
         require(raw.opt("protocolVersion") is Number && raw.getInt("protocolVersion")==2) { "请使用支持增量操作的 v2 JSON 格式" }
         val ops=array(raw,"operations")
@@ -87,6 +87,7 @@ object DraftEngine {
         }
         if(raw.optString("clarification").isNotBlank()) require(ops.all { it.optString("action")=="PATCH" }) { "追问只能补充草稿，不能同时完成或删除" }
         val seen=mutableSetOf<String>()
+        val palette=paletteTasks.toMutableList()
         return ops.map { op ->
             checkKeys(op,setOf("target","action","fields","reminderPatch","startDateAdvice","questions","reminderPolicy"))
             val ref=op.getString("target")
@@ -159,6 +160,8 @@ object DraftEngine {
             else if(t.dueDate==null) decision="NOT_NEEDED"
             else if(decision !in setOf("NONE","UNDECIDED") && action=="PATCH" &&
                 (op.optString("startDateAdvice")=="ASK" || target==null && !op.has("startDateAdvice") && ProposalChoices.mayNeedStart(t.title))) decision="UNDECIDED"
+            if(!f.has("color") && (target==null || old.task.startDate==null && old.task.dueDate==null && old.task.color==0xFF839B75 && (t.startDate!=null || t.dueDate!=null))) t=t.copy(color=TaskPalette.next(palette,t))
+            palette.add(t)
             val b=TaskBundle(t,reminders)
             DraftContent.validatePartial(b)
             val d=TaskDraftEntity(id=previous?.id ?: UUID.randomUUID().toString(),targetTaskId=t.id,

@@ -1,0 +1,15 @@
+<resources>
+    <string name="widget_today_title">今日待办 / %1$d.%2$d</string>
+    <string name="widget_upcoming_title">未来七天 / 时序</string>
+    <string name="widget_month_title">%1$d 年 %2$d 月 / 时序</string>
+    <string name="widget_month_title_narrow">%1$d 月 / 时序</string>
+    <string name="widget_day_description">%1$s，%2$d 个事项</string>
+    <string name="widget_item_marker">■</string>
+    <string name="widget_overdue_task">逾期 · %1$s</string>
+    <string name="widget_empty_message">今日留白\n为下一件事留个位置。</string>
+    <string name="widget_next_reminder">下次提醒 %1$s %2$s</string>
+    <string name="widget_footer_empty">时序 / 把时间留给重要的事</string>
+    <string name="widget_footer_more">%1$d 项待办 · 点击查看全部</string>
+    <string name="widget_footer_count">%1$d 项待办 / 有序进行</string>
+    <string name="widget_no_deadline">无截止日期</string>
+</resources>

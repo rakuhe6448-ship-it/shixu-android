@@ -70,6 +70,7 @@ class AiClient(private val client: OkHttpClient = OkHttpClient.Builder().connect
 phoneAlarmContextData 如有内容，是最近或被引用的手机闹钟卡片。PENDING/WAITING_INPUT 时可结合本次补充返回完整 SET_ALARM，保留未修改时间、重复日与名称；程序会替换旧卡片。APPLIED 仅表示已交给手机时钟，没有系统闹钟 ID；用户要求修改/取消/关闭已交接闹钟时，不得新建来代替修改，返回 intent:"PHONE_ALARM"、空 operations，clarification 告知请点击“打开手机时钟”修改或关闭。只有明确另建闹钟时才返回新的 SET_ALARM。系统闹钟不属于相关事项，不能使用 T1 或 NEW 定位闹钟。手机闹钟通用接口只能设下一次时刻或每周重复，不能设任意未来日期；仍完整保留用户指定的单次 date，由程序检查，不要删掉日期规避校验。
 识别出事项名称但缺少时间/重复方式时，仍要为每个事项返回 PATCH 草稿，把未知项写入各自的 questions，并可同时用 clarification 追问；不能因需要追问就丢弃已识别事项。一条消息可以新建多份 NEW 草稿。若只是询问已有对象且没有字段变化，可返回 clarificationTargets:["T1","T2"] 和空 operations。目标本身不确定或普通闲聊时省略该字段，不把新话题绑定到旧事项。questions 不要重复询问已明确的信息；补充时只更新对应对象，其他对象保留。只有缺信息的草稿不可确认，草稿本身不会触发正式提醒。
 fields 只可包含 title,startDate,dueDate,dueTime,category,notes,color(ARGB整数),repeat(NONE/DAILY/WEEKLY/MONTHLY/YEARLY)。只返回本轮确实要改变的字段，缺少表示保留，不要重写旧标题、类别、日期。信息不全可以先 PATCH 为草稿，缺少标题可不填；不能编造缺失信息。
+未明确指定颜色时省略 color，由本地程序自动区分排期颜色；不要为所有事项返回相同默认颜色。
 追加提醒只给 reminderPatch.mode=MERGE 和 add，每条形如 {"kind":"RELATIVE_MINUTES","relativeMinutes":60,"repeat":"NONE"} 或 {"kind":"ABSOLUTE_LOCAL","localTime":"yyyy-MM-dd'T'HH:mm","repeat":"NONE"}。前者随截止移动，后者独立时间，不能混用两种时间字段。
 修改单条提醒用 update:[{"id":"提供的提醒真实 ID","changes":{"kind":"...","localTime":"..."}}]；删除指定提醒用 removeIds:["真实 ID"]。只有用户明确要求全部替换才用 {"mode":"REPLACE_ALL","items":[完整提醒定义]}，明确全部关闭才用 {"mode":"CLEAR"}。未要求修改提醒则省略 reminderPatch，不要返回空列表来代替保留。
 “再加”“也提醒”“提前一小时/十分钟/一分钟”都是增量，不能把旧提醒重新输出一遍或清空。使用最新 relatedTargetsData 的累计草稿，不使用引用文字中的旧快照。引用 A 或 B 只决定目标身份，不回滚内容。

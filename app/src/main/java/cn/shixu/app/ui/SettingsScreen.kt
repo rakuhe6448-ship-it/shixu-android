@@ -96,11 +96,13 @@ fun SettingsScreen(vm: PlannerViewModel,p: Preferences) {
         item { Box(Modifier.padding(horizontal=18.dp)) { SoftCard {
             Row(Modifier.fillMaxWidth().clickable { appearanceExpanded=!appearanceExpanded },verticalAlignment=Alignment.CenterVertically) { Icon(Icons.Outlined.Palette,null,tint=MaterialTheme.colorScheme.primary); Text("  外观与桌面组件",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium); Icon(if(appearanceExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,null) }
             if(appearanceExpanded) {
+                Text("经典构成 / 纸白 · 朱红 · 几何秩序",style=MaterialTheme.typography.labelLarge)
+                TextButton(onClick={edit=edit.copy(accent=Preferences().accent,background=Preferences().background)}) { Text("恢复经典构成配色") }
                 FlowRow(horizontalArrangement=Arrangement.spacedBy(7.dp)) { listOf("SYSTEM" to "跟随系统","LIGHT" to "浅色","DARK" to "深色").forEach { (v,label) -> FilterChip(selected=edit.theme==v,onClick={edit=edit.copy(theme=v)},label={Text(label)}) } }
                 Text("主题色",style=MaterialTheme.typography.labelLarge)
-                ColorChoices(edit.accent,listOf(0xFF66785B,0xFF557C94,0xFF927357,0xFF86749B,0xFF9C6477)) { edit=edit.copy(accent=it) }
+                ColorChoices(edit.accent,TaskColors) { edit=edit.copy(accent=it) }
                 Text("浅色背景",style=MaterialTheme.typography.labelLarge)
-                ColorChoices(edit.background,listOf(0xFFF7F8F2,0xFFF4F7FB,0xFFFCF7F2,0xFFF8F4FA,0xFFFFF5F7,0xFFFFFFFF)) { edit=edit.copy(background=it) }
+                ColorChoices(edit.background,listOf(0xFFF4EFDF,0xFFF3F0E9,0xFFF0E8DC,0xFFFFFFFF)) { edit=edit.copy(background=it) }
                 var customAccent by remember(edit.accent) { mutableStateOf("#%06X".format(edit.accent and 0xFFFFFF)) }
                 var customBackground by remember(edit.background) { mutableStateOf("#%06X".format(edit.background and 0xFFFFFF)) }
                 OutlinedTextField(customAccent,{customAccent=it},label={Text("自定义主题色 #RRGGBB")},singleLine=true,modifier=Modifier.fillMaxWidth(),trailingIcon={IconButton(onClick={parseHex(customAccent)?.let {edit=edit.copy(accent=it)} ?: vm.notify("请输入 #RRGGBB 格式颜色")}){Icon(Icons.Outlined.Check,"应用主题色")}})
@@ -120,7 +122,7 @@ fun SettingsScreen(vm: PlannerViewModel,p: Preferences) {
                 Text("通知使用本地模板，不联网调用 AI。自定义人格作用于聊天，通知采用标准模板。选择标准助手即可关闭角色风格。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } } }
-        item { Button(onClick={vm.saveSettings(edit,key)},enabled=!profileLoading,modifier=Modifier.padding(horizontal=18.dp).fillMaxWidth().height(50.dp),shape=RoundedCornerShape(16.dp)) { Text("保存设置") } }
+        item { Button(onClick={vm.saveSettings(edit,key)},enabled=!profileLoading,modifier=Modifier.padding(horizontal=18.dp).fillMaxWidth().height(50.dp),shape=RoundedCornerShape(6.dp)) { Text("保存设置") } }
         item { TextButton(onClick=vm::showPermissionIntro,modifier=Modifier.padding(horizontal=18.dp)) { Icon(Icons.Outlined.NotificationsActive,null);Text("  重新检查提醒权限") } }
         item { Box(Modifier.padding(horizontal=18.dp)) { SoftCard {
             SectionLabel("本地数据")

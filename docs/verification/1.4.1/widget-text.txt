@@ -1,0 +1,1 @@
+PASS: 13 widget strings verified in compiled APK; no replacement placeholders in renderer.

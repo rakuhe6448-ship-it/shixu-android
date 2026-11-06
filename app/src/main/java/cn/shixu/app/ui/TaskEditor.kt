@@ -38,12 +38,13 @@ fun TaskEditor(vm: PlannerViewModel, initial: TaskBundle) {
     var reminders by remember(initial.task.id,initial.task.version) { mutableStateOf(initial.reminders) }
     var error by remember { mutableStateOf<String?>(null) }
     var discard by remember { mutableStateOf(false) }
+    var autoColor by remember(initial.task.id) { mutableStateOf(vm.editorVersion==null || initial.task.startDate==null && initial.task.dueDate==null && initial.task.color==0xFF839B75) }
     val changeTask: (TaskEntity)->Unit = { new ->
         if(new.deadline()!=task.deadline()) reminders=reminders.map { r ->
             if(r.relativeMinutes!=null && new.deadline()!=null) r.copy(localTime=new.deadline()!!.minusMinutes(r.relativeMinutes).toString(),enabled=true,lastFiredLocal=null,scheduledAt=null,delivery="PENDING")
             else if(r.relativeMinutes!=null) r.copy(relativeMinutes=null) else r
         }
-        task=new
+        task=if(autoColor) new.copy(color=TaskPalette.next(vm.tasks.value,new)) else new
     }
     val close: ()->Unit = { if(task!=initial.task || reminders!=initial.reminders) discard=true else vm.editor=null }
     Dialog(onDismissRequest={if(!vm.saving) close()},properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
@@ -57,7 +58,7 @@ fun TaskEditor(vm: PlannerViewModel, initial: TaskBundle) {
                     }) { Text(if(vm.saving) "保存中" else "保存") }
                 }
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-                    OutlinedTextField(task.title,{task=task.copy(title=it.take(200))},label={Text("想安排什么？")},placeholder={Text("例如：流体输配管网作业")},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(18.dp),maxLines=3)
+                    OutlinedTextField(task.title,{task=task.copy(title=it.take(200))},label={Text("想安排什么？")},placeholder={Text("例如：流体输配管网作业")},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(6.dp),maxLines=3)
                     error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
                     SoftCard {
                         SectionLabel("时间安排")
@@ -90,8 +91,12 @@ fun TaskEditor(vm: PlannerViewModel, initial: TaskBundle) {
                         SectionLabel("整理一下")
                         OutlinedTextField(task.category,{task=task.copy(category=it.take(40))},label={Text("分类")},singleLine=true,modifier=Modifier.fillMaxWidth())
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) { listOf("学习","工作","生活","日常").forEach { c -> SuggestionChip(onClick={task=task.copy(category=c)},label={Text(c)}) } }
-                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
-                            TaskColors.forEach { c -> Surface(onClick={task=task.copy(color=c)},shape=CircleShape,color=Color(c),modifier=Modifier.size(32.dp),border=if(task.color==c) BorderStroke(3.dp,MaterialTheme.colorScheme.onSurface) else null) { if(task.color==c) Icon(Icons.Outlined.Check,"已选颜色",Modifier.padding(5.dp),tint=Color(0xFF203020)) } }
+                        Row(verticalAlignment=Alignment.CenterVertically) {
+                            Checkbox(checked=autoColor,onCheckedChange={autoColor=it;if(it) task=task.copy(color=TaskPalette.next(vm.tasks.value,task))})
+                            Column { Text("自动配色",style=MaterialTheme.typography.labelLarge); Text("优先区分同日期的事项，也可手选颜色",style=MaterialTheme.typography.bodySmall) }
+                        }
+                        FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            TaskColors.forEach { c -> Surface(onClick={autoColor=false;task=task.copy(color=c)},shape=RoundedCornerShape(4.dp),color=Color(c),modifier=Modifier.size(36.dp),border=if(task.color==c) BorderStroke(3.dp,MaterialTheme.colorScheme.onSurface) else null) { if(task.color==c) Icon(Icons.Outlined.Check,"已选颜色",Modifier.padding(6.dp),tint=Color.White) } }
                         }
                         OutlinedTextField(task.notes,{task=task.copy(notes=it.take(10000))},label={Text("备注")},placeholder={Text("地点、材料、具体要求……")},minLines=3,modifier=Modifier.fillMaxWidth())
                     }
@@ -123,7 +128,7 @@ private fun ReminderEditor(r: ReminderEntity, task: TaskEntity, onChange: (Remin
         val minutes=if(r.relativeMinutes!=null && task.deadline()!=null) Duration.between(new,task.deadline()).toMinutes().takeIf { it>=0 } else null
         onChange(r.copy(localTime=new.toString(),relativeMinutes=minutes,enabled=true,lastFiredLocal=null,scheduledAt=null,delivery="PENDING"))
     }
-    Surface(shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.6f)) {
+    Surface(shape=RoundedCornerShape(6.dp),color=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.6f)) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Icon(Icons.Outlined.NotificationsNone,null,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.primary)

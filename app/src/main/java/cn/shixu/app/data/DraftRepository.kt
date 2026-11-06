@@ -42,7 +42,8 @@ suspend fun Repository.acceptAiResult(raw: JSONObject,sourceId: String,context: 
         }
         require(!PhoneAlarm.explicitRequest(source.text) || raw.optJSONArray("operations")?.length()==0) { "你要求的是手机闹钟，模型却返回了普通事项；本次未保存，请明确闹钟时间后重试" }
         require(context.phoneAlarm==null || source.quoteId==null || raw.optJSONArray("operations")?.length()==0) { "引用的是手机闹钟，不能修改成排期事项；请打开手机时钟管理" }
-        val changes=DraftEngine.normalize(raw,sourceId,context)
+        check(source.state!="DELETED") { "原消息已删除，请重新发送" }
+        val changes=DraftEngine.normalize(raw,sourceId,context,paletteTasks=dao.tasks()+dao.drafts().filter { it.status=="OPEN" }.map { DraftContent.bundle(it).task })
         val used=changes.map { it.draft.targetTaskId }.toSet()
         context.targets.filter { it.bundle.task.id in used }.forEach { target ->
             check(dao.draftForTask(target.bundle.task.id)?.revision==target.draft?.revision) { "草稿已更新，请重新发送这条补充" }

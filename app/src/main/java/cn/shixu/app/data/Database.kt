@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 interface PlannerDao {
     @Query("SELECT * FROM tasks ORDER BY dueDate IS NULL, dueDate, createdAt") fun observeTasks(): Flow<List<TaskEntity>>
     @Query("SELECT * FROM reminders ORDER BY localTime") fun observeReminders(): Flow<List<ReminderEntity>>
-    @Query("SELECT * FROM messages ORDER BY createdAt, rowid") fun observeMessages(): Flow<List<MessageEntity>>
+    @Query("SELECT * FROM messages WHERE state != 'DELETED' ORDER BY createdAt, rowid") fun observeMessages(): Flow<List<MessageEntity>>
     @Query("SELECT * FROM message_tasks") fun observeLinks(): Flow<List<MessageTask>>
     @Query("SELECT * FROM task_drafts ORDER BY updatedAt DESC") fun observeDrafts(): Flow<List<TaskDraftEntity>>
     @Query("SELECT * FROM task_drafts") suspend fun drafts(): List<TaskDraftEntity>
@@ -44,6 +44,7 @@ interface PlannerDao {
     @Query("DELETE FROM reminders WHERE taskId=:id") suspend fun deleteReminders(id: String)
     @Query("DELETE FROM message_tasks") suspend fun clearLinks()
     @Query("DELETE FROM messages") suspend fun clearMessages()
+    @Query("UPDATE history SET sourceMessageId=NULL WHERE sourceMessageId IS NOT NULL") suspend fun clearHistorySources()
     @Query("DELETE FROM history") suspend fun clearHistory()
     @Query("DELETE FROM reminders") suspend fun clearReminders()
     @Query("DELETE FROM tasks") suspend fun clearTasks()

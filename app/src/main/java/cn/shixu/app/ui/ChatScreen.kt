@@ -8,6 +8,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.*
+import androidx.compose.animation.animateContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.Reply
@@ -42,9 +43,32 @@ fun ChatScreen(vm: PlannerViewModel,messages: List<MessageEntity>,tasks: List<Ta
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let(vm::attach) }
     val byId=messages.associateBy { it.id }
     val drafts by vm.drafts.collectAsState()
-    LaunchedEffect(messages.size,vm.aiBusy) { if(messages.isNotEmpty()) scroll.animateScrollToItem(messages.size+1) }
+    var deleteMessage by remember { mutableStateOf<MessageEntity?>(null) }
+    var clearHistory by remember { mutableStateOf(false) }
+    var historyMenu by remember { mutableStateOf(false) }
+    var previousCount by remember { mutableIntStateOf(0) }
+    val canDelete=!vm.aiBusy && !vm.attachmentBusy && !vm.proposalSaving && !vm.chatDeleting && !vm.dataBusy
+    LaunchedEffect(messages.size,vm.aiBusy) {
+        if(messages.size>previousCount && messages.isNotEmpty()) {
+            if(previousCount==0) scroll.scrollToItem(messages.size+1)
+            else if((scroll.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0)>=previousCount) scroll.animateScrollToItem(messages.size+1)
+        }
+        previousCount=messages.size
+    }
+    if(deleteMessage!=null || clearHistory) AlertDialog(onDismissRequest={deleteMessage=null;clearHistory=false},
+        title={Text(if(clearHistory) "清空聊天历史？" else "删除这条消息？")},
+        text={Text(if(clearHistory) "聊天文字、图片和未确认草稿将被清空。已保存事项、提醒和变更记录会保留，手机时钟中的闹钟也不会删除。" else "删除消息文字与图片，已保存事项和待确认事项草稿会保留。其他消息中的引用将显示为已删除。")},
+        confirmButton={TextButton(enabled=canDelete,onClick={vm.deleteChat(if(clearHistory) null else deleteMessage!!.id);deleteMessage=null;clearHistory=false}) { Text("删除",color=MaterialTheme.colorScheme.error) }},
+        dismissButton={TextButton(onClick={deleteMessage=null;clearHistory=false}) { Text("取消") }})
     Column(Modifier.fillMaxSize().imePadding()) {
-        PageHeading("聊聊安排", "${Personality.styles[p.personality]} · 确认后才会保存")
+        PageHeading("聊聊安排", "${Personality.styles[p.personality]} · 确认后才会保存") {
+            Box {
+                IconButton(onClick={historyMenu=true}) { Icon(Icons.Outlined.MoreVert,"聊天记录管理") }
+                DropdownMenu(expanded=historyMenu,onDismissRequest={historyMenu=false}) {
+                    DropdownMenuItem(text={Text("清空聊天历史")},leadingIcon={Icon(Icons.Outlined.DeleteSweep,null)},enabled=canDelete && (messages.isNotEmpty() || drafts.isNotEmpty()),onClick={historyMenu=false;clearHistory=true})
+                }
+            }
+        }
         LazyColumn(Modifier.weight(1f),state=scroll,contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp),verticalArrangement=Arrangement.spacedBy(15.dp)) {
             item {
                 if(messages.isEmpty()) EmptyCard("把事情说给我听", "发一句话，或分享群公告截图。\n我会整理成任务卡片，等你确认。",Icons.Outlined.AutoAwesome) {
@@ -63,11 +87,16 @@ fun ChatScreen(vm: PlannerViewModel,messages: List<MessageEntity>,tasks: List<Ta
             }
             items(messages,key={it.id}) { message ->
                 val mine=message.role=="user"
-                Column(Modifier.fillMaxWidth(),horizontalAlignment=if(mine) Alignment.End else Alignment.Start) {
+                var messageMenu by remember(message.id) { mutableStateOf(false) }
+                Column(Modifier.fillMaxWidth().animateItem(),horizontalAlignment=if(mine) Alignment.End else Alignment.Start) {
                     Text(if(mine) "我" else "时序",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(horizontal=5.dp,vertical=4.dp))
-                    Surface(shape=RoundedCornerShape(topStart=20.dp,topEnd=20.dp,bottomStart=if(mine) 20.dp else 5.dp,bottomEnd=if(mine) 5.dp else 20.dp),color=if(mine) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,modifier=Modifier.widthIn(max=340.dp).combinedClickable(onClick={},onLongClick={vm.quote(message)})) {
-                        Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                            message.quoteId?.let { id -> byId[id]?.let { quoted -> QuoteBlock(quoted) } }
+                    Surface(shape=RoundedCornerShape(6.dp),color=if(mine) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,border=BorderStroke(1.dp,if(mine) MaterialTheme.colorScheme.primary.copy(alpha=.25f) else MaterialTheme.colorScheme.outlineVariant),modifier=Modifier.widthIn(max=340.dp).combinedClickable(onClick={},onLongClick={messageMenu=true})) {
+                        Column(Modifier.animateContentSize().padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                            DropdownMenu(expanded=messageMenu,onDismissRequest={messageMenu=false}) {
+                                DropdownMenuItem(text={Text("引用消息")},onClick={messageMenu=false;vm.quote(message)})
+                                DropdownMenuItem(text={Text("删除消息")},enabled=canDelete,onClick={messageMenu=false;deleteMessage=message})
+                            }
+                            message.quoteId?.let { id -> byId[id]?.let { quoted -> QuoteBlock(quoted) } ?: Text("引用的消息已删除",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
                             if(message.sharedText.isNotBlank()) SharedTextBlock(message.sharedText)
                             JSONArray(message.imagePaths).strings().forEach { AttachmentImage(it,Modifier.fillMaxWidth().height(160.dp)) }
                             if(message.text.isNotBlank()) Text(message.text,style=MaterialTheme.typography.bodyMedium,color=if(message.state=="ERROR") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
@@ -76,13 +105,14 @@ fun ChatScreen(vm: PlannerViewModel,messages: List<MessageEntity>,tasks: List<Ta
                                 Text(time,fontSize=10.sp,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.weight(1f))
                                 TextButton(onClick={vm.quote(message)},contentPadding=PaddingValues(horizontal=5.dp,vertical=0.dp),modifier=Modifier.height(28.dp)) { Icon(Icons.AutoMirrored.Outlined.Reply,null,Modifier.size(14.dp)); Text("引用",fontSize=11.sp) }
                                 if(mine) TextButton(onClick={vm.draft=message.text;vm.draftSharedText=message.sharedText;vm.draftImages=JSONArray(message.imagePaths).strings();vm.quoteId=message.quoteId},modifier=Modifier.height(28.dp),contentPadding=PaddingValues(horizontal=5.dp,vertical=0.dp)) { Text("重用",fontSize=11.sp) }
+                                IconButton(onClick={deleteMessage=message},enabled=canDelete,modifier=Modifier.size(36.dp)) { Icon(Icons.Outlined.DeleteOutline,"删除消息",Modifier.size(16.dp)) }
                             }
                         }
                     }
                     if(message.proposal!=null) ProposalCard(vm,message)
                     val linked=links.filter { it.messageId==message.id }.mapNotNull { link -> tasks.find { it.id==link.taskId && it.deletedAt==null } }
                     if(linked.isNotEmpty() && message.state!="PENDING") linked.forEach { task ->
-                        Surface(onClick={vm.detailsId=task.id},modifier=Modifier.padding(top=7.dp).widthIn(max=340.dp).fillMaxWidth(),shape=RoundedCornerShape(15.dp),color=MaterialTheme.colorScheme.secondaryContainer.copy(alpha=.5f)) {
+                        Surface(onClick={vm.detailsId=task.id},modifier=Modifier.padding(top=7.dp).widthIn(max=340.dp).fillMaxWidth(),shape=RoundedCornerShape(6.dp),color=MaterialTheme.colorScheme.secondaryContainer.copy(alpha=.5f)) {
                             Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                                 Icon(if(task.completedAt!=null) Icons.Outlined.TaskAlt else Icons.Outlined.EventNote,null,Modifier.size(22.dp),tint=MaterialTheme.colorScheme.primary)
                                 Column(Modifier.weight(1f)) { Text(task.title,style=MaterialTheme.typography.labelLarge,maxLines=1,overflow=TextOverflow.Ellipsis); Text(if(task.completedAt!=null) "已完成 ✨" else taskDateLabel(task),style=MaterialTheme.typography.bodySmall) }
@@ -111,8 +141,8 @@ fun ChatScreen(vm: PlannerViewModel,messages: List<MessageEntity>,tasks: List<Ta
                 if(vm.draftImages.isNotEmpty()) Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { vm.draftImages.forEach { name -> Box { AttachmentImage(name,Modifier.size(64.dp)); IconButton(onClick={vm.draftImages=vm.draftImages-name},modifier=Modifier.align(Alignment.TopEnd).size(23.dp).background(MaterialTheme.colorScheme.surface,CircleShape)) { Icon(Icons.Outlined.Close,"移除图片",Modifier.size(14.dp)) } } } }
                 Row(verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(5.dp)) {
                     IconButton(onClick={picker.launch("image/*")},enabled=!vm.attachmentBusy && vm.draftImages.size<4) { Icon(Icons.Outlined.AddPhotoAlternate,"添加图片") }
-                    OutlinedTextField(vm.draft,{vm.draft=it},placeholder={Text(if(vm.attachmentBusy) "正在导入图片…" else "说说接下来要做的事")},modifier=Modifier.weight(1f),shape=RoundedCornerShape(24.dp),maxLines=4)
-                    FilledIconButton(onClick=vm::send,enabled=!vm.aiBusy && !vm.attachmentBusy && (vm.draft.isNotBlank()||vm.draftImages.isNotEmpty()||vm.draftSharedText.isNotBlank()),modifier=Modifier.padding(bottom=4.dp)) { Icon(Icons.AutoMirrored.Outlined.Send,"发送") }
+                    OutlinedTextField(vm.draft,{vm.draft=it},placeholder={Text(if(vm.attachmentBusy) "正在导入图片…" else "说说接下来要做的事")},modifier=Modifier.weight(1f),shape=RoundedCornerShape(6.dp),maxLines=4)
+                    FilledIconButton(onClick=vm::send,enabled=!vm.aiBusy && !vm.attachmentBusy && !vm.chatDeleting && (vm.draft.isNotBlank()||vm.draftImages.isNotEmpty()||vm.draftSharedText.isNotBlank()),modifier=Modifier.padding(bottom=4.dp)) { Icon(Icons.AutoMirrored.Outlined.Send,"发送") }
                 }
             }
         }
@@ -148,7 +178,7 @@ fun AttachmentImage(name: String,modifier: Modifier=Modifier) {
 private fun ProposalCard(vm: PlannerViewModel,message: MessageEntity) {
     if(PhoneAlarm.isProposal(message.proposal)) { PhoneAlarmCard(vm,message);return }
     val operations=remember(message.proposal) { runCatching { JSONObject(message.proposal!!).getJSONArray("operations").objects() }.getOrDefault(emptyList()) }
-    Surface(modifier=Modifier.padding(top=8.dp).fillMaxWidth(),shape=RoundedCornerShape(18.dp),color=MaterialTheme.colorScheme.surfaceContainerLow,border=BorderStroke(1.dp,MaterialTheme.colorScheme.primary.copy(alpha=.25f))) {
+    Surface(modifier=Modifier.padding(top=8.dp).fillMaxWidth(),shape=RoundedCornerShape(6.dp),color=MaterialTheme.colorScheme.surfaceContainerLow,border=BorderStroke(1.dp,MaterialTheme.colorScheme.primary.copy(alpha=.25f))) {
         Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             Text(when(message.state){"APPLIED" -> "已应用到排期 ✓"; "DISMISSED" -> "这条建议已取消";"SUPERSEDED" -> "已有更新，请查看最新草稿";"CONFLICT" -> "事项已变化，需要重新核对";"WAITING_INPUT" -> "草稿待补充，尚未保存";else -> "待确认的操作"},style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.primary)
             operations.forEach { op ->
@@ -192,7 +222,7 @@ private fun ProposalCard(vm: PlannerViewModel,message: MessageEntity) {
 private fun PhoneAlarmCard(vm: PlannerViewModel,message: MessageEntity) {
     val context=LocalContext.current
     val alarm=remember(message.proposal) { runCatching { PhoneAlarm.fromProposal(message.proposal!!) }.getOrNull() }
-    Surface(modifier=Modifier.padding(top=8.dp).fillMaxWidth(),shape=RoundedCornerShape(18.dp),color=MaterialTheme.colorScheme.surfaceContainerLow,border=BorderStroke(1.dp,MaterialTheme.colorScheme.primary.copy(alpha=.25f))) {
+    Surface(modifier=Modifier.padding(top=8.dp).fillMaxWidth(),shape=RoundedCornerShape(6.dp),color=MaterialTheme.colorScheme.surfaceContainerLow,border=BorderStroke(1.dp,MaterialTheme.colorScheme.primary.copy(alpha=.25f))) {
         Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             Text(when(message.state) {
                 "APPLIED" -> "已交给手机时钟"

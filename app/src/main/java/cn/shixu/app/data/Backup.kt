@@ -69,7 +69,8 @@ class Backup(private val app: ShiXuApp) {
         tasks.forEach { require(it.version>0); Rules.validate(it,remindersByTask[it.id].orEmpty()) }
         reminders.forEach { require(it.taskId in taskIds) { "提醒关联缺失" }; it.lastFiredLocal?.let(LocalDateTime::parse); it.scheduledLocal?.let(LocalDateTime::parse) }
         messages.forEach {
-            require(it.role in setOf("user","assistant") && it.text.length<=60000 && it.sharedText.length<=12000 && it.state in setOf("SENT","PENDING","APPLIED","DISMISSED","ERROR","WAITING_INPUT","SUPERSEDED","CONFLICT")) { "聊天记录格式错误" }
+            require(it.role in setOf("user","assistant") && it.text.length<=60000 && it.sharedText.length<=12000 && it.state in setOf("SENT","PENDING","APPLIED","DISMISSED","ERROR","WAITING_INPUT","SUPERSEDED","CONFLICT","DELETED")) { "聊天记录格式错误" }
+            require(it.state!="DELETED" || it.text.isEmpty() && it.sharedText.isEmpty() && it.imagePaths=="[]" && it.proposal==null && it.quoteId==null) { "已删除消息不能包含聊天内容" }
             require(it.quoteId==null || it.quoteId in messageIds) { "引用消息缺失" }
             it.proposal?.let { proposal ->
                 if(PhoneAlarm.isProposal(proposal)) {

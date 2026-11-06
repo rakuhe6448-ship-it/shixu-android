@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.shape.*
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -29,15 +31,14 @@ import java.time.*
 @Composable
 fun CalendarScreen(vm: PlannerViewModel, tasks: List<TaskEntity>) {
     val active=tasks.filter { it.active }
-    val weeks=remember(vm.month,active) { CalendarLayout.weeks(vm.month,active) }
     val today=LocalDate.now()
     val overdue=active.filter { it.overdue() }
     val swipeDistance=with(LocalDensity.current) { 56.dp.toPx() }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=100.dp)) {
-        item { PageHeading("时序", "把重要的事，放在看得见的时间里") { Surface(shape=CircleShape,color=MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.FilterVintage,null,Modifier.padding(13.dp).size(25.dp),tint=MaterialTheme.colorScheme.primary) } } }
+        item { PageHeading("时序", "把重要的事，放在看得见的时间里") { Surface(shape=RoundedCornerShape(4.dp),color=MaterialTheme.colorScheme.onSurface) { Text("时\n序",Modifier.padding(horizontal=12.dp,vertical=6.dp),color=MaterialTheme.colorScheme.surface,style=MaterialTheme.typography.titleMedium) } } }
         item {
             Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) { Text("${vm.month.monthValue} 月",style=MaterialTheme.typography.headlineMedium); Text("${vm.month.year}  /  ${active.size} 件进行中的事",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+                Column(Modifier.weight(1f)) { Text("${vm.month.monthValue} 月",style=MaterialTheme.typography.headlineMedium,color=MaterialTheme.colorScheme.primary); Text("${vm.month.year}  /  ${active.size} 件进行中的事",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
                 IconButton(onClick={vm.changeMonth(-1)}) { Icon(Icons.Outlined.ChevronLeft,"上个月") }
                 TextButton(onClick={vm.month=YearMonth.now(); vm.selectedDate=today}) { Text("今天") }
                 IconButton(onClick={vm.changeMonth(1)}) { Icon(Icons.Outlined.ChevronRight,"下个月") }
@@ -56,7 +57,14 @@ fun CalendarScreen(vm: PlannerViewModel, tasks: List<TaskEntity>) {
                     distance=0f
                 }) { change,amount -> change.consume();distance+=amount }
             }) {
-                weeks.forEach { week -> key(week.start,vm.month) { CalendarWeekView(week,vm.month,vm.selectedDate,{vm.selectedDate=it},{vm.detailsId=it.id}) } }
+                AnimatedContent(targetState=vm.month,transitionSpec={
+                    val direction=if(targetState>initialState) 1 else -1
+                    (fadeIn(tween(180))+slideInHorizontally(tween(220)) { it/8*direction }) togetherWith
+                        (fadeOut(tween(100))+slideOutHorizontally(tween(180)) { -it/8*direction })
+                },label="calendar-month") { shownMonth ->
+                    val weeks=remember(shownMonth,active) { CalendarLayout.weeks(shownMonth,active) }
+                    Column { weeks.forEach { week -> key(week.start,shownMonth) { CalendarWeekView(week,shownMonth,vm.selectedDate,{vm.selectedDate=it},{vm.detailsId=it.id}) } } }
+                }
             }
         }
         item {
@@ -82,7 +90,7 @@ private fun CalendarWeekView(week: CalendarWeek, month: YearMonth, selected: Loc
     var expanded by remember(week.start,month) { mutableStateOf(false) }
     val visibleLanes=if(expanded) week.lanes else minOf(week.lanes,3)
     val height=42.dp + 25.dp*visibleLanes + if(week.lanes>3) 24.dp else 8.dp
-    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal=12.dp).height(height)) {
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal=12.dp).animateContentSize().height(height)) {
         val cell=maxWidth/7
         Row(Modifier.fillMaxWidth()) {
             (0..6).forEach { index ->
@@ -90,7 +98,8 @@ private fun CalendarWeekView(week: CalendarWeek, month: YearMonth, selected: Loc
                 Box(Modifier.width(cell).height(38.dp).clip(RoundedCornerShape(12.dp)).clickable { onDate(date) },contentAlignment=Alignment.Center) {
                     val isToday=date==LocalDate.now()
                     val isSelected=date==selected
-                    Surface(shape=CircleShape,color=when { isToday -> MaterialTheme.colorScheme.primary; isSelected -> MaterialTheme.colorScheme.primaryContainer; else -> Color.Transparent }) {
+                    val selection by animateColorAsState(when { isToday -> MaterialTheme.colorScheme.primary; isSelected -> MaterialTheme.colorScheme.primaryContainer; else -> Color.Transparent },tween(160),label="date-selection")
+                    Surface(shape=RoundedCornerShape(3.dp),color=selection) {
                         Box(Modifier.size(31.dp),contentAlignment=Alignment.Center) { Text(date.dayOfMonth.toString(),fontWeight=if(isToday||isSelected) FontWeight.Bold else FontWeight.Normal,fontSize=13.sp,color=when { isToday -> MaterialTheme.colorScheme.onPrimary; YearMonth.from(date)!=month -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.4f); else -> MaterialTheme.colorScheme.onSurface }) }
                     }
                 }
@@ -98,7 +107,7 @@ private fun CalendarWeekView(week: CalendarWeek, month: YearMonth, selected: Loc
         }
         week.bars.filter { it.lane<visibleLanes }.forEach { bar ->
             val bg=Color(bar.task.color)
-            val foreground=if(bg.copy(alpha=.82f).compositeOver(MaterialTheme.colorScheme.background).luminance()<.35f) Color.White else Color(0xFF233022)
+            val foreground=if(bg.copy(alpha=.82f).compositeOver(MaterialTheme.colorScheme.background).luminance()<.179f) Color.White else Color(0xFF242421)
             Box(Modifier.offset(x=cell*bar.start+2.dp,y=41.dp+25.dp*bar.lane).width(cell*(bar.end-bar.start+1)-4.dp).height(21.dp)
                 .clip(RoundedCornerShape(topStart=if(bar.continuesBefore) 2.dp else 6.dp,bottomStart=if(bar.continuesBefore) 2.dp else 6.dp,topEnd=if(bar.continuesAfter) 2.dp else 6.dp,bottomEnd=if(bar.continuesAfter) 2.dp else 6.dp)).background(bg.copy(alpha=.82f)).clickable { onTask(bar.task) }.padding(horizontal=5.dp),contentAlignment=Alignment.CenterStart) {
                 Text((if(bar.task.startDate==null) "◇ " else "")+bar.task.title,fontSize=10.sp,lineHeight=13.sp,fontWeight=FontWeight.Medium,maxLines=1,overflow=TextOverflow.Ellipsis,color=foreground)

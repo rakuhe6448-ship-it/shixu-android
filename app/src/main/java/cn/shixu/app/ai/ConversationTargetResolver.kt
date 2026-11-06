@@ -5,7 +5,7 @@ import cn.shixu.app.data.*
 object ConversationTargetResolver {
     suspend fun resolve(repo: Repository,current: MessageEntity): ConversationContext {
         val dao=repo.dao
-        val messages=dao.messages().filter { it.id!=current.id }
+        val messages=dao.messages().filter { it.id!=current.id && it.state!="DELETED" }
         val quoted=current.quoteId?.let { dao.message(it) }
         fun trail(start: MessageEntity?): List<MessageEntity> {
             val result=mutableListOf<MessageEntity>();val visited=mutableSetOf<String>();var node=start

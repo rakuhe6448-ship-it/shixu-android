@@ -36,7 +36,7 @@ fun TodoScreen(vm: PlannerViewModel,tasks: List<TaskEntity>) {
         item {
             Column(Modifier.padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { FilterChip(selected=!completed,onClick={completed=false},label={Text("进行中 ${tasks.count { it.active }}")}); FilterChip(selected=completed,onClick={completed=true},label={Text("已完成 ${tasks.count { it.completedAt!=null && it.deletedAt==null }}")},leadingIcon={Icon(Icons.Outlined.CheckCircle,null,Modifier.size(17.dp))}) }
-                OutlinedTextField(query,{query=it},placeholder={Text("搜索事项或备注")},leadingIcon={Icon(Icons.Outlined.Search,null)},singleLine=true,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(query,{query=it},placeholder={Text("搜索事项或备注")},leadingIcon={Icon(Icons.Outlined.Search,null)},singleLine=true,shape=RoundedCornerShape(6.dp),modifier=Modifier.fillMaxWidth())
                 Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(7.dp)) {
                     FilterChip(selected=category==null,onClick={category=null},label={Text("全部分类")})
                     tasks.filter { it.deletedAt==null }.map { it.category }.distinct().forEach { c -> FilterChip(selected=category==c,onClick={category=c},label={Text(c)}) }
@@ -44,7 +44,7 @@ fun TodoScreen(vm: PlannerViewModel,tasks: List<TaskEntity>) {
             }
         }
         if(visible.isEmpty()) item { EmptyCard(if(completed) "完成的事会留在这里" else "没有匹配的事项",if(completed) "在日历或待办中点圆圈，即可标记完成。" else "添加一件事，或试试其他搜索词。",if(completed) Icons.Outlined.Celebration else Icons.Outlined.Checklist) }
-        items(visible,key={it.id}) { t -> Box(Modifier.padding(horizontal=18.dp)) { TaskRow(t,{vm.detailsId=t.id},if(t.active) {{vm.taskAction(t,"COMPLETE")}} else null) } }
+        items(visible,key={it.id}) { t -> Box(Modifier.animateItem().padding(horizontal=18.dp)) { TaskRow(t,{vm.detailsId=t.id},if(t.active) {{vm.taskAction(t,"COMPLETE")}} else null) } }
     }
 }
 
@@ -90,7 +90,7 @@ fun RemindersScreen(vm: PlannerViewModel,tasks: List<TaskEntity>,reminders: List
         items(shown,key={it.id}) { r ->
             val task=taskMap.getValue(r.taskId)
             val next=if(history) r.lastFiredLocal ?: r.localTime else Rules.nextReminder(r,LocalDateTime.now())?.toString() ?: r.localTime
-            Surface(onClick={vm.detailsId=task.id},modifier=Modifier.padding(horizontal=18.dp).fillMaxWidth(),shape=RoundedCornerShape(20.dp),color=MaterialTheme.colorScheme.surfaceContainerLow) {
+            Surface(onClick={vm.detailsId=task.id},modifier=Modifier.animateItem().padding(horizontal=18.dp).fillMaxWidth(),shape=RoundedCornerShape(6.dp),color=MaterialTheme.colorScheme.surfaceContainerLow) {
                 Row(Modifier.padding(16.dp),horizontalArrangement=Arrangement.spacedBy(14.dp),verticalAlignment=Alignment.CenterVertically) {
                     Icon(Icons.Outlined.NotificationsNone,null,tint=MaterialTheme.colorScheme.primary)
                     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {

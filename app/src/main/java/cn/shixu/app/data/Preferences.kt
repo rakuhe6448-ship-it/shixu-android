@@ -27,8 +27,8 @@ data class Preferences(
     val personality: String = "STANDARD",
     val customPrompt: String = "",
     val theme: String = "SYSTEM",
-    val accent: Long = 0xFF66785B,
-    val background: Long = 0xFFF7F8F2,
+    val accent: Long = 0xFFBE3A2B,
+    val background: Long = 0xFFF4EFDF,
     val widgetOpacity: Float = .94f,
     val provider: String = ApiProviders.COMPATIBLE
 ) {
@@ -42,7 +42,7 @@ data class Preferences(
             val legacyEndpoint=m["endpoint"].orEmpty()
             val provider=m["provider"]?.takeIf { it in ApiProviders.labels } ?: if(runCatching { java.net.URI(legacyEndpoint).host }.getOrNull()=="api.deepseek.com") ApiProviders.DEEPSEEK else ApiProviders.COMPATIBLE
             val endpoint=if(provider==ApiProviders.DEEPSEEK && legacyEndpoint.trimEnd('/')=="https://api.deepseek.com") "https://api.deepseek.com/v1" else legacyEndpoint
-            return Preferences(endpoint,m["model"] ?: d.model,m["vision"]?.toBooleanStrictOrNull() ?: false,m["jsonMode"]?.toBooleanStrictOrNull() ?: true,m["personality"] ?: d.personality,m["customPrompt"] ?: "",m["theme"] ?: d.theme,m["accent"]?.toLongOrNull() ?: d.accent,m["background"]?.toLongOrNull() ?: d.background,m["widgetOpacity"]?.toFloatOrNull()?.coerceIn(0f,1f) ?: d.widgetOpacity,provider)
+            return Preferences(endpoint,m["model"] ?: d.model,m["vision"]?.toBooleanStrictOrNull() ?: false,m["jsonMode"]?.toBooleanStrictOrNull() ?: true,m["personality"] ?: d.personality,m["customPrompt"] ?: "",m["theme"] ?: d.theme,m["accent"]?.toLongOrNull()?.takeUnless { it==0xFF66785B } ?: d.accent,m["background"]?.toLongOrNull()?.takeUnless { it==0xFFF7F8F2 } ?: d.background,m["widgetOpacity"]?.toFloatOrNull()?.coerceIn(0f,1f) ?: d.widgetOpacity,provider)
         }
     }
 }

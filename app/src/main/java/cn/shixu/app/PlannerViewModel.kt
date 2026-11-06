@@ -54,6 +54,8 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
     var draftImages by mutableStateOf<List<String>>(emptyList())
     var quoteId by mutableStateOf<String?>(null)
     var aiBusy by mutableStateOf(false)
+    var chatDeleting by mutableStateOf(false)
+        private set
     var attachmentBusy by mutableStateOf(false)
     var saving by mutableStateOf(false)
     var apiTesting by mutableStateOf(false)
@@ -84,7 +86,8 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         if(manualOnly) notify("已进入排期；需要提醒时，可在提醒页补齐权限")
     }
     fun newTask(date: LocalDate=selectedDate) {
-        editor=TaskBundle(TaskEntity(title="",dueDate=date.toString()),emptyList()); editorVersion=null
+        val task=TaskEntity(title="",dueDate=date.toString())
+        editor=TaskBundle(task.copy(color=TaskPalette.next(tasks.value,task)),emptyList()); editorVersion=null
     }
     fun editTask(id: String) = operation { editor=repo.bundle(id) ?: error("事项不存在"); editorVersion=editor!!.task.version; detailsId=null }
     fun saveTask(bundle: TaskBundle) {
@@ -108,6 +111,19 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         notify(when(action){"COMPLETE" -> if(task.repeat=="NONE") "又完成一件事，做得好 ✨" else "这一期完成了 ✨ 下一期已加入排期"; "DELETE" -> "事项已删除，相关提醒已取消"; else -> "事项已恢复"})
     }
     fun quote(message: MessageEntity) { quoteId=message.id; page=3 }
+    fun deleteChat(messageId: String? = null) {
+        if(aiBusy || attachmentBusy || proposalSaving || chatDeleting || dataBusy) { notify("请等待当前操作结束后再删除");return }
+        chatDeleting=true
+        operation { try {
+            val unused=repo.deleteChatHistory(messageId)
+            if(messageId==null || quoteId==messageId) quoteId=null
+            if(messageId==null || startDateMessage?.id==messageId) startDateMessage=null
+            val cleanupFailed=withContext(Dispatchers.IO) { unused.filterNot { it in draftImages }.count { name ->
+                runCatching { val file=Attachments.file(app,name);file.exists() && !file.delete() }.getOrDefault(true)
+            } }
+            notify(if(cleanupFailed>0) "记录已删除，部分图片文件清理失败" else if(messageId==null) "聊天记录与未确认草稿已清空，已保存事项保留" else "消息已删除，事项与草稿保留")
+        } finally { chatDeleting=false } }
+    }
     fun discussTask(task: TaskEntity) = operation {
         val message=MessageEntity(role="assistant",text="事项：${task.title}\n${cn.shixu.app.ui.taskDateLabel(task)}\n可以引用这张卡片，补充或修改安排。")
         repo.putMessage(message)
@@ -131,7 +147,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
     fun send() {
-        if(aiBusy || attachmentBusy || draft.isBlank() && draftImages.isEmpty() && draftSharedText.isBlank()) return
+        if(aiBusy || attachmentBusy || chatDeleting || dataBusy || draft.isBlank() && draftImages.isEmpty() && draftSharedText.isBlank()) return
         val shared=draftSharedText
         val text=draft.trim().ifBlank { if(shared.isNotBlank()) "请识别这条分享内容中的事项。" else "请识别图片中的事项。" }; val images=draftImages; val quote=quoteId
         if(text.length>12000) { notify("单条消息最多 12000 字"); return }
@@ -171,12 +187,13 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
     var proposalError by mutableStateOf<String?>(null)
         private set
     fun requestApplyProposal(message: MessageEntity) {
+        if(chatDeleting) return
         proposalError=null
         if(message.proposal!=null && cn.shixu.app.ai.ProposalChoices.pending(message.proposal).isNotEmpty()) startDateMessage=message
         else applyProposal(message.id)
     }
     fun openPhoneAlarm(message: MessageEntity,context: Context) {
-        if(proposalSaving) return
+        if(proposalSaving || chatDeleting) return
         proposalSaving=true
         operation { try {
             repo.handoffPhoneAlarm(message.id) { context.startActivity(SystemClock.createIntent(it)) }
@@ -191,7 +208,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         catch(_: SecurityException) { notify("手机系统拒绝打开时钟，请从桌面打开时钟") }
     }
     fun applyProposal(id: String, startDates: Map<String,String?> = emptyMap()) {
-        if(proposalSaving) return
+        if(proposalSaving || chatDeleting) return
         proposalSaving=true;proposalError=null
         operation { try {
             repo.applyProposal(id,startDates);startDateMessage=null;notify("已保存到排期，提醒已同步")
