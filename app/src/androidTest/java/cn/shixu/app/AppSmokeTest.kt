@@ -37,6 +37,36 @@ class AppSmokeTest {
         compose.waitUntil(10000) { runBlocking { app.repository.dao.message(answer.id)?.state=="APPLIED" } }
         assertTrue(runBlocking { app.repository.dao.tasks().isEmpty() && app.repository.dao.reminders().isEmpty() })
     }
+    @Test fun calendarSwipesChangeMonthAndKeepDateClicksAndArrowsWorking() {
+        val vm=ViewModelProvider(compose.activity)[PlannerViewModel::class.java]
+        compose.runOnIdle { vm.month=YearMonth.of(2027,12);vm.selectedDate=LocalDate.of(2027,12,31) }
+        compose.onNodeWithTag("calendar-month-grid").performTouchInput { swipeLeft() }
+        compose.runOnIdle { assertEquals(YearMonth.of(2028,1),vm.month);assertEquals(LocalDate.of(2028,1,31),vm.selectedDate) }
+        compose.onNodeWithTag("calendar-month-grid").performTouchInput { swipeLeft() }
+        compose.runOnIdle { assertEquals(YearMonth.of(2028,2),vm.month);assertEquals(LocalDate.of(2028,2,29),vm.selectedDate) }
+        compose.onNodeWithTag("calendar-month-grid").performTouchInput { swipeRight() }
+        compose.runOnIdle { assertEquals(YearMonth.of(2028,1),vm.month) }
+        compose.onNodeWithContentDescription("上个月").performClick()
+        compose.onNodeWithText("15",useUnmergedTree=true).performClick()
+        compose.runOnIdle { assertEquals(LocalDate.of(2027,12,15),vm.selectedDate) }
+    }
+    @Test fun clarificationCardsAllowSavingReadyTodoWhileAnotherNeedsTime() {
+        runBlocking {
+            val repo=app.repository
+            val source=MessageEntity(role="user",text="每周清洁要通知，每天护肤只待办");repo.putMessage(source)
+            val clean=JSONObject().put("target","NEW").put("action","PATCH").put("fields",JSONObject().put("title","面部清洁").put("repeat","WEEKLY"))
+                .put("reminderPolicy","NOTIFICATION").put("questions",JSONArray().put(cn.shixu.app.ai.DraftQuestion("REMINDER_TIME","每周几、几点提醒清洁？").json()))
+            val skin=JSONObject().put("target","NEW").put("action","PATCH").put("fields",JSONObject().put("title","护肤").put("repeat","DAILY")).put("reminderPolicy","NONE")
+            repo.acceptAiResult(JSONObject().put("protocolVersion",2).put("clarification","请补充清洁时刻").put("operations",JSONArray().put(clean).put(skin)),source.id,repo.conversationContext(source),"")
+        }
+        compose.onNodeWithText("AI 聊天",useUnmergedTree=true).performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("单独核对这件事").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("单独核对这件事").performScrollTo().performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("确认执行").filter(isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodesWithText("确认执行").filter(isEnabled()).onFirst().performScrollTo().performClick()
+        compose.waitUntil(10000) { runBlocking { app.repository.dao.tasks().size==1 } }
+        runBlocking { assertEquals("护肤",app.repository.dao.tasks().single().title);assertTrue(app.repository.dao.reminders().isEmpty());assertEquals(1,app.repository.dao.drafts().count { it.status=="OPEN" }) }
+    }
     @Test fun manualCreateCompleteAndRestoreThroughRealUi() {
         compose.onNodeWithText("新建事项",useUnmergedTree=true).performClick()
         compose.onNodeWithText("想安排什么？").performTextInput("手动流程验收")

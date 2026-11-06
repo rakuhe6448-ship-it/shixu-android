@@ -91,7 +91,9 @@ class Backup(private val app: ShiXuApp) {
         drafts.forEach { d ->
             require(d.targetKind in setOf("NEW","SAVED") && d.status in setOf("OPEN","APPLIED","CANCELLED","CONFLICT") && d.revision>0 && d.sourceMessageId in messageIds) { "草稿格式不正确" }
             require(if(d.targetKind=="NEW") d.baseTaskVersion==null && d.targetTaskId !in taskIds else d.baseTaskVersion!=null && d.baseTaskVersion>0 && d.targetTaskId in taskIds) { "草稿目标不正确" }
-            require(JSONObject(d.workingJson).getInt("formatVersion")==1 && DraftContent.action(d) in setOf("UPSERT","COMPLETE","DELETE") && DraftContent.intent(d) in setOf("UNSPECIFIED","EXPLICIT") && DraftContent.decision(d) in setOf("NOT_NEEDED","UNDECIDED","DATE","NONE")) { "草稿版本或状态不正确" }
+            require(JSONObject(d.workingJson).getInt("formatVersion") in setOf(1,2) && DraftContent.action(d) in setOf("UPSERT","COMPLETE","DELETE") && DraftContent.intent(d) in setOf("UNSPECIFIED","EXPLICIT","NONE","NOTIFICATION","DEFAULT") && DraftContent.decision(d) in setOf("NOT_NEEDED","UNDECIDED","DATE","NONE")) { "草稿版本或状态不正确" }
+            DraftContent.questions(d)
+            require(DraftContent.group(d) in messageIds) { "草稿会话来源缺失" }
             val b=DraftContent.bundle(d);require(b.task.id==d.targetTaskId);DraftContent.validatePartial(b)
         }
         val draftIds=drafts.map { it.id }.toSet()

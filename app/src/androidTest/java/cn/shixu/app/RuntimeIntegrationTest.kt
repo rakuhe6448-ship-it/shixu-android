@@ -28,6 +28,31 @@ class RuntimeIntegrationTest {
     private fun shell(command: String) {
         ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes() }
     }
+    @Test fun explicitNoReminderCancelsTheRegisteredSystemAlarm() = runBlocking {
+        if(Build.VERSION.SDK_INT>=33) shell("pm grant ${app.packageName} android.permission.POST_NOTIFICATIONS")
+        if(Build.VERSION.SDK_INT>=31) shell("appops set ${app.packageName} SCHEDULE_EXACT_ALARM allow")
+        val task=TaskEntity(title="取消通知验收")
+        val reminder=ReminderEntity(taskId=task.id,localTime=LocalDateTime.now().plusDays(1).withNano(0).toString())
+        fun alarmDump()=ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand("dumpsys alarm")).use { it.bufferedReader().readText() }
+        fun queuedCount()=alarmDump().lineSequence().count { it.trim()=="tag=*walarm*:cn.shixu.REMINDER" }
+        val registry=app.getSharedPreferences("scheduled_alarm_ids",android.content.Context.MODE_PRIVATE)
+        val before=queuedCount()
+        try {
+            app.repository.save(TaskBundle(task,listOf(reminder)),null)
+            assertNotNull(app.repository.dao.reminder(reminder.id)!!.scheduledAt)
+            assertTrue(reminder.id in registry.getStringSet("ids",emptySet()).orEmpty())
+            assertEquals(before+1,queuedCount())
+            val anchor=MessageEntity(role="assistant",text=task.title);app.repository.putMessage(anchor);app.repository.dao.putLink(MessageTask(anchor.id,task.id))
+            val source=MessageEntity(role="user",text="只做待办，不用通知",quoteId=anchor.id);app.repository.putMessage(source)
+            val raw=org.json.JSONObject().put("protocolVersion",2).put("operations",org.json.JSONArray().put(org.json.JSONObject().put("target","T1").put("action","PATCH").put("reminderPolicy","NONE")))
+            val answer=app.repository.acceptAiResult(raw,source.id,app.repository.conversationContext(source),"")
+            app.repository.applyProposal(answer.id)
+            assertTrue(app.repository.dao.remindersFor(task.id).isEmpty())
+            assertFalse(reminder.id in registry.getStringSet("ids",emptySet()).orEmpty())
+            assertEquals(before,queuedCount())
+            assertTrue(app.repository.dao.task(task.id)!!.active)
+        } finally { app.repository.dao.task(task.id)?.let { app.repository.setState(it.id,it.version,"DELETE") };app.alarms.cancel(reminder.id) }
+    }
     @Test fun systemAlarmActuallyDeliversThroughBroadcastReceiver() = runBlocking {
         if(Build.VERSION.SDK_INT>=33) shell("pm grant ${app.packageName} android.permission.POST_NOTIFICATIONS")
         if(Build.VERSION.SDK_INT>=31) shell("appops set ${app.packageName} SCHEDULE_EXACT_ALARM allow")

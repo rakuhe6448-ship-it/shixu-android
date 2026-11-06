@@ -93,4 +93,21 @@ class BackupIntegrationTest {
         try { repo.handoffPhoneAlarm(answer.id) { fail("Imported clock action executed") };fail("Imported action accepted") } catch(_: IllegalStateException) { }
         assertTrue(repo.dao.tasks().isEmpty());assertTrue(repo.dao.reminders().isEmpty())
     }
+    @Test fun clarificationQuestionsAndGroupSurviveBackupWithoutScheduling() = runBlocking {
+        val repo=app.repository
+        val source=MessageEntity(role="user",text="每三天提醒清洁");repo.putMessage(source)
+        val question=cn.shixu.app.ai.DraftQuestion("REPEAT","请选择当前支持的重复周期","每三天")
+        val raw=JSONObject().put("protocolVersion",2).put("clarification","需要确认周期和时刻").put("operations",JSONArray().put(JSONObject().put("target","NEW").put("action","PATCH")
+            .put("fields",JSONObject().put("title","清洁")).put("reminderPolicy","NOTIFICATION").put("questions",JSONArray().put(question.json()))))
+        repo.acceptAiResult(raw,source.id,repo.conversationContext(source),"")
+        val id=repo.dao.drafts().single().id
+        val backup=Backup(app);val uri=Uri.fromFile(File(app.cacheDir,"questions-roundtrip.json"))
+        backup.export(uri);backup.restore(backup.read(uri))
+        val restored=repo.dao.draft(id)!!
+        assertEquals(source.id,cn.shixu.app.ai.DraftContent.group(restored))
+        assertEquals(question,cn.shixu.app.ai.DraftContent.questions(restored).single())
+        assertFalse(cn.shixu.app.ai.DraftContent.ready(restored))
+        assertEquals("WAITING_INPUT",repo.previewDraft(id).state)
+        assertTrue(repo.dao.tasks().isEmpty());assertTrue(repo.dao.reminders().isEmpty())
+    }
 }

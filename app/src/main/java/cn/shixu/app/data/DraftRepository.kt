@@ -49,21 +49,26 @@ suspend fun Repository.acceptAiResult(raw: JSONObject,sourceId: String,context: 
             check(dao.task(target.bundle.task.id)?.version==target.formal?.task?.version) { "事项已变化，请重新核对" }
         }
         val proposal=changes.takeIf { it.isNotEmpty() }?.let { DraftContent.proposal(sourceId,it) }
-        val answer=MessageEntity(id=responseId,role="assistant",text=if(proposal!=null) proposalReply else
+        val answer=MessageEntity(id=responseId,role="assistant",text=if(proposal!=null) raw.optString("clarification").take(4000).ifBlank { proposalReply } else
             "本条回复未更改排期。\n"+raw.optString("clarification").ifBlank { raw.optString("reply","请补充事项信息。") }.take(4000),
-            quoteId=sourceId,proposal=proposal,state=if(changes.isEmpty()) "SENT" else if(changes.all { DraftContent.ready(DraftContent.bundle(it.draft)) }) "PENDING" else "WAITING_INPUT")
+            quoteId=sourceId,proposal=proposal,state=if(changes.isEmpty()) "SENT" else if(changes.all { DraftContent.ready(it.draft) }) "PENDING" else "WAITING_INPUT")
         changes.forEach { dao.putDraft(it.draft) }
         supersedeDraftCards(changes.map { it.draft.id }.toSet())
         dao.putMessage(answer)
-        val clarificationTarget=context.targets.find { it.ref==raw.optString("clarificationTarget") }
-            ?: context.targets.singleOrNull()?.takeIf { context.quoteBound }
-        val associated=if(changes.isNotEmpty()) changes.map { it.draft } else clarificationTarget?.draft?.takeIf { it.status=="OPEN" }?.let(::listOf).orEmpty()
+        val requested=raw.optJSONArray("clarificationTargets")?.strings().orEmpty()+raw.optString("clarificationTarget")
+        val clarificationTargets=context.targets.filter { it.ref in requested }.ifEmpty { if(context.quoteBound) context.targets else emptyList() }
+        val associated=if(changes.isNotEmpty()) changes.map { it.draft } else clarificationTargets.mapNotNull { it.draft?.takeIf { d -> d.status=="OPEN" } }
         associated.forEach { draft ->
             dao.putDraftLink(MessageDraft(sourceId,draft.id));dao.putDraftLink(MessageDraft(answer.id,draft.id))
             if(draft.targetKind=="SAVED") { dao.putLink(MessageTask(sourceId,draft.targetTaskId));dao.putLink(MessageTask(answer.id,draft.targetTaskId)) }
         }
+        if(changes.isNotEmpty() && context.unresolvedQuote) context.quoted?.let { quoted ->
+            // Repair a legacy unbound clarification only along the explicit quote edge.
+            val anchors=listOfNotNull(quoted.id,quoted.quoteId?.takeIf { dao.message(it)?.role=="user" })
+            anchors.forEach { id -> changes.forEach { dao.putDraftLink(MessageDraft(id,it.draft.id)) } }
+        }
         // A clarification about a uniquely resolved saved task should also retain its identity.
-        if(changes.isEmpty() && associated.isEmpty()) clarificationTarget?.formal?.task?.let { task ->
+        if(changes.isEmpty() && associated.isEmpty()) clarificationTargets.mapNotNull { it.formal?.task }.forEach { task ->
             dao.putLink(MessageTask(sourceId,task.id));dao.putLink(MessageTask(answer.id,task.id))
         }
         answer
@@ -75,6 +80,7 @@ internal suspend fun Repository.checkProposalDrafts(envelope: JSONObject) {
     envelope.getJSONArray("operations").objects().forEach { op ->
         val draft=dao.draft(op.getString("draftId")) ?: error("草稿不存在")
         check(draft.status=="OPEN" && draft.revision==op.getInt("expectedRevision")) { "卡片已过期，请打开最新草稿" }
+        check(DraftContent.ready(draft)) { "这份草稿仍有待补充的问题，请先确定后再保存" }
         val proposed=JsonCodec.readBundle(op.getJSONObject("bundle"))
         check(proposed.task.id==draft.targetTaskId) { "卡片目标与草稿不一致" }
         val actual=dao.task(draft.targetTaskId)
@@ -87,7 +93,7 @@ internal suspend fun Repository.commitDraft(op: JSONObject,bundle: TaskBundle) {
     val draft=dao.draft(op.getString("draftId")) ?: error("草稿不存在")
     val decision=if(op.has("startDateChoice")) if(bundle.task.startDate==null) "NONE" else "DATE" else DraftContent.decision(draft)
     dao.putDraft(draft.copy(targetKind="SAVED",baseTaskVersion=bundle.task.version,revision=draft.revision+1,status="APPLIED",
-        workingJson=DraftContent.encode(bundle,"UPSERT",DraftContent.intent(draft),decision),updatedAt=System.currentTimeMillis()))
+        workingJson=DraftContent.encode(bundle,"UPSERT",DraftContent.intent(draft),decision,groupId=DraftContent.group(draft)),updatedAt=System.currentTimeMillis()))
     dao.messagesForDraft(draft.id).forEach { dao.putLink(MessageTask(it.messageId,bundle.task.id)) }
     supersedeDraftCards(setOf(draft.id))
 }
@@ -121,10 +127,10 @@ suspend fun Repository.previewDraft(id: String): MessageEntity = gate.withLock {
     if(draft.status=="CONFLICT") { draft=draft.copy(status="OPEN",revision=draft.revision+1);dao.putDraft(draft) }
     check(dao.message(draft.sourceMessageId)!=null) { "原消息不存在，请取消该草稿后重新录入" }
     val b=DraftContent.live(draft,formal)
-    draft=draft.copy(workingJson=DraftContent.encode(b,DraftContent.action(draft),DraftContent.intent(draft),DraftContent.decision(draft)))
+    draft=draft.copy(workingJson=DraftContent.encode(b,DraftContent.action(draft),DraftContent.intent(draft),DraftContent.decision(draft),DraftContent.questions(draft),DraftContent.group(draft)))
     dao.putDraft(draft)
     val message=MessageEntity(role="assistant",text="这是当前累计的事项草稿，请核对后确认。",quoteId=draft.sourceMessageId,
-        proposal=DraftContent.proposal(draft.sourceMessageId,listOf(DraftChange(draft,formal))),state=if(DraftContent.ready(b)) "PENDING" else "WAITING_INPUT")
+        proposal=DraftContent.proposal(draft.sourceMessageId,listOf(DraftChange(draft,formal))),state=if(DraftContent.ready(draft)) "PENDING" else "WAITING_INPUT")
     supersedeDraftCards(setOf(id));dao.putMessage(message);dao.putDraftLink(MessageDraft(message.id,id));message
 } }
 

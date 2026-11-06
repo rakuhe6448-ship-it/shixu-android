@@ -7,6 +7,11 @@ object ConversationTargetResolver {
         val dao=repo.dao
         val messages=dao.messages().filter { it.id!=current.id }
         val quoted=current.quoteId?.let { dao.message(it) }
+        fun trail(start: MessageEntity?): List<MessageEntity> {
+            val result=mutableListOf<MessageEntity>();val visited=mutableSetOf<String>();var node=start
+            repeat(16) { val at=node;if(at!=null && visited.add(at.id)) { result.add(at);node=at.quoteId?.let { id -> messages.find { it.id==id } } } }
+            return result
+        }
         // Clock requests have no task IDs. Keep their context separate from the planner.
         fun alarmFor(message: MessageEntity): MessageEntity? = if(PhoneAlarm.isProposal(message.proposal)) message else
             messages.lastOrNull { it.quoteId==message.id && PhoneAlarm.isProposal(it.proposal) }
@@ -32,15 +37,19 @@ object ConversationTargetResolver {
             }
         } else if(current.quoteId==null) {
             val latest=messages.lastOrNull()
-            if(latest!=null && latest.state !in setOf("ERROR","DISMISSED","CONFLICT","SUPERSEDED")) {
-                ids=direct(latest)
-                if(ids.isEmpty() && latest.role=="assistant") latest.quoteId?.let { id -> dao.message(id)?.takeIf { it.role=="user" }?.let { ids=direct(it) } }
+            if(latest!=null && latest.state !in setOf("DISMISSED","CONFLICT","SUPERSEDED")) {
+                for(at in trail(latest)) { ids=direct(at);if(ids.isNotEmpty()) break }
             }
         }
         val bound=ids.isNotEmpty()
+        if(quoted==null && ids.isNotEmpty()) {
+            val groups=ids.mapNotNull { dao.draftForTask(it)?.let(DraftContent::group) }.toSet()
+            ids=ids+dao.drafts().filter { it.status=="OPEN" && DraftContent.group(it) in groups }.map { it.targetTaskId }
+        }
         if(!bound && current.quoteId==null) {
             val pairs=current.text.windowed(2).toSet()
-            ids=dao.tasks().filter { it.active }.map { t -> t to ((if(current.text.contains(t.title)) 100 else 0)+t.title.windowed(2).count { it in pairs }) }
+            val candidates=(dao.tasks().filter { it.active }+dao.drafts().filter { it.status=="OPEN" }.map { DraftContent.bundle(it).task }).distinctBy { it.id }
+            ids=candidates.map { t -> t to ((if(t.title.isNotBlank() && current.text.contains(t.title)) 100 else 0)+t.title.windowed(2).count { it in pairs }) }
                 .filter { it.second>=2 }.sortedByDescending { it.second }.take(4).map { it.first.id }.toSet()
         }
         val targets=ids.mapIndexed { index,id ->
@@ -53,7 +62,10 @@ object ConversationTargetResolver {
             val bundle=if(d?.status=="OPEN") DraftContent.live(d,formal) else formal ?: error("事项不存在")
             ConversationTarget("T${index+1}",bundle,if(d?.status=="CANCELLED") d.copy(status="APPLIED") else d,formal)
         }
-        val related=messages.filter { m -> ids.isNotEmpty() && direct(m).any { it in ids } }.takeLast(3)
+        val linked=messages.filter { m -> ids.isNotEmpty() && direct(m).any { it in ids } }.takeLast(3)
+        val latest=messages.lastOrNull()
+        val ancestry=if(quoted!=null) trail(quoted) else if(latest?.role=="assistant" && (latest.state in setOf("WAITING_INPUT","ERROR") || latest.text.startsWith("本条回复未更改排期。"))) trail(latest) else emptyList()
+        val related=(linked+ancestry).distinctBy { it.id }.sortedBy { it.createdAt }.takeLast(6)
         return ConversationContext(targets,quoted,related,quoteBound=current.quoteId!=null && bound,unresolvedQuote=current.quoteId!=null && !bound)
     }
 }

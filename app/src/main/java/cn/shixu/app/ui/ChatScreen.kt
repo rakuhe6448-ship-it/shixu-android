@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import cn.shixu.app.PlannerViewModel
 import cn.shixu.app.ai.Attachments
 import cn.shixu.app.ai.PhoneAlarm
+import cn.shixu.app.ai.DraftQuestion
 import cn.shixu.app.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -166,7 +167,10 @@ private fun ProposalCard(vm: PlannerViewModel,message: MessageEntity) {
                         }
                         if(op.optBoolean("needsStartDate",false)) Text("建议补充开始日期，日历可显示持续排期条",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary)
                         if(bundle.task.notes.isNotBlank()) Text(bundle.task.notes,maxLines=4,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall)
-                        if(bundle.reminders.isEmpty()) Text("不设置提醒",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        val questions=DraftQuestion.read(op.optJSONArray("questions") ?: JSONArray())
+                        questions.forEach { q -> Text("待补充：${q.text}"+(q.requestedValue?.let { "（原要求：$it）" } ?: ""),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary) }
+                        if(bundle.reminders.isEmpty()) Text(if(op.optString("reminderIntent") in setOf("NOTIFICATION","DEFAULT")) "通知待补充，尚未安排" else "不设置提醒",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        if(message.state=="WAITING_INPUT" && op.optBoolean("ready",false) && op.has("draftId")) TextButton(onClick={vm.reviewDraft(op.getString("draftId"))}) { Text("单独核对这件事") }
                         bundle.reminders.forEach { r -> Text("提醒 ${r.localTime.replace('T',' ')} · ${if(r.relativeMinutes!=null) "随截止移动" else "独立时间"} · ${RepeatRule.valueOf(r.repeat).label}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary) }
                     } else Text("相关未触发提醒会取消",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }

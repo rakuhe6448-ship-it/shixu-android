@@ -3,6 +3,7 @@ package cn.shixu.app.ui
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -10,6 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -28,14 +32,15 @@ fun CalendarScreen(vm: PlannerViewModel, tasks: List<TaskEntity>) {
     val weeks=remember(vm.month,active) { CalendarLayout.weeks(vm.month,active) }
     val today=LocalDate.now()
     val overdue=active.filter { it.overdue() }
+    val swipeDistance=with(LocalDensity.current) { 56.dp.toPx() }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=100.dp)) {
         item { PageHeading("时序", "把重要的事，放在看得见的时间里") { Surface(shape=CircleShape,color=MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.FilterVintage,null,Modifier.padding(13.dp).size(25.dp),tint=MaterialTheme.colorScheme.primary) } } }
         item {
             Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) { Text("${vm.month.monthValue} 月",style=MaterialTheme.typography.headlineMedium); Text("${vm.month.year}  /  ${active.size} 件进行中的事",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
-                IconButton(onClick={vm.month=vm.month.minusMonths(1)}) { Icon(Icons.Outlined.ChevronLeft,"上个月") }
+                IconButton(onClick={vm.changeMonth(-1)}) { Icon(Icons.Outlined.ChevronLeft,"上个月") }
                 TextButton(onClick={vm.month=YearMonth.now(); vm.selectedDate=today}) { Text("今天") }
-                IconButton(onClick={vm.month=vm.month.plusMonths(1)}) { Icon(Icons.Outlined.ChevronRight,"下个月") }
+                IconButton(onClick={vm.changeMonth(1)}) { Icon(Icons.Outlined.ChevronRight,"下个月") }
             }
         }
         item {
@@ -43,7 +48,17 @@ fun CalendarScreen(vm: PlannerViewModel, tasks: List<TaskEntity>) {
                 listOf("一","二","三","四","五","六","日").forEach { Text(it,Modifier.weight(1f),textAlign=androidx.compose.ui.text.style.TextAlign.Center,style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
-        items(weeks,key={it.start.toString()}) { week -> CalendarWeekView(week,vm.month,vm.selectedDate,{vm.selectedDate=it},{vm.detailsId=it.id}) }
+        item {
+            Column(Modifier.fillMaxWidth().testTag("calendar-month-grid").pointerInput(swipeDistance) {
+                var distance=0f
+                detectHorizontalDragGestures(onDragStart={distance=0f},onDragCancel={distance=0f},onDragEnd={
+                    if(kotlin.math.abs(distance)>=swipeDistance) vm.changeMonth(if(distance<0) 1 else -1)
+                    distance=0f
+                }) { change,amount -> change.consume();distance+=amount }
+            }) {
+                weeks.forEach { week -> key(week.start,vm.month) { CalendarWeekView(week,vm.month,vm.selectedDate,{vm.selectedDate=it},{vm.detailsId=it.id}) } }
+            }
+        }
         item {
             Row(Modifier.padding(horizontal=22.dp,vertical=10.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Outlined.Info,null,Modifier.size(14.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)

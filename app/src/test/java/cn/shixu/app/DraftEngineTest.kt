@@ -61,20 +61,63 @@ class DraftEngineTest {
         val d=DraftEngine.normalize(response(op),"source",ConversationContext(emptyList(),null,emptyList()),now).single().draft
         assertEquals("UNDECIDED",DraftContent.decision(d))
     }
-    @Test fun titleOnlyDraftGetsOneDefaultWhenDeadlineIsAddedLater() {
+    @Test fun addingDeadlineDoesNotOptIntoNotificationsButExplicitDefaultDoes() {
         val empty=ConversationContext(emptyList(),null,emptyList())
         val a=DraftEngine.normalize(response(JSONObject().put("target","NEW").put("action","PATCH").put("fields",JSONObject().put("title","抢报名额"))),"a",empty,now).single().draft
         val context=ConversationContext(listOf(ConversationTarget("T1",DraftContent.bundle(a),a,null)),null,emptyList())
         val patch=JSONObject().put("target","T1").put("action","PATCH").put("fields",JSONObject().put("dueDate","2026-11-02").put("dueTime","15:00"))
         val b=DraftEngine.normalize(response(patch),"b",context,now).single().draft
-        val reminder=DraftContent.bundle(b).reminders.single()
+        assertTrue(DraftContent.bundle(b).reminders.isEmpty())
+        val chosen=DraftEngine.normalize(response(patch.put("reminderPolicy","DEFAULT")),"b2",context,now).single().draft
+        val reminder=DraftContent.bundle(chosen).reminders.single()
         assertEquals("2026-11-01T09:00",reminder.localTime)
-        val after=DraftEngine.normalize(response(JSONObject().put("target","T1").put("action","PATCH").put("fields",JSONObject().put("notes","带材料"))),"c",context.copy(targets=listOf(ConversationTarget("T1",DraftContent.bundle(b),b,null))),now).single().draft
+        val after=DraftEngine.normalize(response(JSONObject().put("target","T1").put("action","PATCH").put("fields",JSONObject().put("notes","带材料"))),"c",context.copy(targets=listOf(ConversationTarget("T1",DraftContent.bundle(chosen),chosen,null))),now).single().draft
         assertEquals(reminder.id,DraftContent.bundle(after).reminders.single().id)
     }
     @Test fun quoteCannotCreateASeparateTaskOrAddressUnknownTarget() {
         val quoted=context(emptyList()).copy(quoteBound=true)
         assertThrows(IllegalArgumentException::class.java) { DraftEngine.normalize(response(JSONObject().put("target","NEW").put("action","PATCH")),"source",quoted,now) }
         assertThrows(IllegalStateException::class.java) { DraftEngine.normalize(response(JSONObject().put("target","T999").put("action","PATCH")),"source",quoted,now) }
+    }
+    @Test fun clarificationCanPersistMultiplePartialDraftsWithoutInventingTimes() {
+        val clean=JSONObject().put("target","NEW").put("action","PATCH").put("fields",JSONObject().put("title","面部清洁"))
+            .put("reminderPolicy","NOTIFICATION").put("questions",JSONArray().put(DraftQuestion("REPEAT","目前不支持每三天，请选择支持的周期","每隔三天").json()))
+        val skin=JSONObject().put("target","NEW").put("action","PATCH").put("fields",JSONObject().put("title","护肤").put("repeat","DAILY")).put("reminderPolicy","NOTIFICATION")
+        val raw=JSONObject().put("protocolVersion",2).put("clarification","请补充周期与通知时刻").put("operations",JSONArray().put(clean).put(skin))
+        val changes=DraftEngine.normalize(raw,"source",ConversationContext(emptyList(),null,emptyList()),now)
+        assertEquals(2,changes.size);assertEquals(2,changes.map { it.draft.id }.distinct().size)
+        assertTrue(changes.all { !DraftContent.ready(it.draft) && DraftContent.bundle(it.draft).reminders.isEmpty() })
+        assertEquals(setOf("source"),changes.map { DraftContent.group(it.draft) }.toSet())
+        assertEquals("每隔三天",DraftContent.questions(changes.first().draft).single().requestedValue)
+    }
+    @Test fun todoOnlyClearsNotificationQuestionsAndUsesAnAllDayRepeatAnchor() {
+        val create=JSONObject().put("target","NEW").put("action","PATCH").put("fields",JSONObject().put("title","护肤").put("repeat","DAILY"))
+            .put("reminderPolicy","NOTIFICATION").put("questions",JSONArray().put(DraftQuestion("REMINDER_TIME","晚上几点通知？").json()))
+        val a=DraftEngine.normalize(response(create),"a",ConversationContext(emptyList(),null,emptyList()),now).single().draft
+        val c=ConversationContext(listOf(ConversationTarget("T1",DraftContent.bundle(a),a,null)),null,emptyList())
+        val b=DraftEngine.normalize(response(JSONObject().put("target","T1").put("action","PATCH").put("reminderPolicy","NONE")),"b",c,now).single().draft
+        val bundle=DraftContent.bundle(b)
+        assertTrue(DraftContent.ready(b));assertTrue(DraftContent.pending(b).isEmpty())
+        assertEquals("2026-10-27",bundle.task.dueDate);assertNull(bundle.task.dueTime);assertTrue(bundle.reminders.isEmpty())
+        val later=DraftEngine.normalize(response(JSONObject().put("target","T1").put("action","PATCH").put("fields",JSONObject().put("dueDate","2026-11-02"))),"c",c.copy(targets=listOf(ConversationTarget("T1",bundle,b,null))),now).single().draft
+        assertEquals("NONE",DraftContent.intent(later));assertTrue(DraftContent.bundle(later).reminders.isEmpty())
+    }
+    @Test fun unresolvedRepeatCannotDisappearOnAnUnrelatedPatchOrEmptyQuestions() {
+        val create=JSONObject().put("target","NEW").put("action","PATCH").put("fields",JSONObject().put("title","清洁"))
+            .put("questions",JSONArray().put(DraftQuestion("REPEAT","每三天暂不支持","每三天").json()))
+        val a=DraftEngine.normalize(response(create),"a",ConversationContext(emptyList(),null,emptyList()),now).single().draft
+        val c=ConversationContext(listOf(ConversationTarget("T1",DraftContent.bundle(a),a,null)),null,emptyList())
+        val b=DraftEngine.normalize(response(JSONObject().put("target","T1").put("action","PATCH").put("questions",JSONArray()).put("fields",JSONObject().put("notes","温水清洁"))),"b",c,now).single().draft
+        assertFalse(DraftContent.ready(b));assertEquals("REPEAT",DraftContent.questions(b).single().field)
+        assertThrows(IllegalArgumentException::class.java) { DraftEngine.normalize(response(JSONObject().put("target","T1").put("action","PATCH").put("fields",JSONObject().put("repeat","EVERY_3_DAYS"))),"bad",c,now) }
+    }
+    @Test fun noReminderPolicyCannotBeCombinedWithAddingANotification() {
+        assertThrows(IllegalArgumentException::class.java) { result(op(merge(absolute("2026-11-01T22:00"))).put("reminderPolicy","NONE"),context(emptyList())) }
+    }
+    @Test fun unboundQuotedTextMayBeParsedButCannotAddressAnUnknownFormalTask() {
+        val c=ConversationContext(emptyList(),null,emptyList(),unresolvedQuote=true)
+        val create=JSONObject().put("target","NEW").put("action","PATCH").put("fields",JSONObject().put("title","补回旧草稿")).put("reminderPolicy","NONE")
+        assertTrue(DraftContent.ready(DraftEngine.normalize(response(create),"source",c,now).single().draft))
+        assertThrows(IllegalStateException::class.java) { DraftEngine.normalize(response(create.put("target","T999")),"source",c,now) }
     }
 }

@@ -1,5 +1,7 @@
 # AI 多轮事项：数据契约与状态转换
 
+这是 1.2.0 的历史规格。1.3.0 的追问、提醒默认值及草稿格式更新见 [1.3.0 契约](AI_INTAKE-1.3.0.md)，冲突处以新契约为准。
+
 日期：2026-10-27。状态：实施规格；核心实现对应 1.2.0，实际验收结果另列。
 
 本规格基于改造前 Room schema 1、`PlannerViewModel.send`、`ProposalValidator` 和 `Repository.applyProposal`。实施新增 `DraftEngine`、`ConversationTargetResolver` 与 `DraftRepository`，数据库升级为 schema 2。

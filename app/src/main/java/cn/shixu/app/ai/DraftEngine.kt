@@ -15,10 +15,21 @@ object DraftContent {
     fun action(d: TaskDraftEntity)=JSONObject(d.workingJson).optString("action","UPSERT")
     fun decision(d: TaskDraftEntity)=JSONObject(d.workingJson).optString("startDateDecision","NOT_NEEDED")
     fun intent(d: TaskDraftEntity)=JSONObject(d.workingJson).optString("reminderIntent","EXPLICIT")
-    fun encode(b: TaskBundle,action: String,intent: String,decision: String): String {
+    fun group(d: TaskDraftEntity)=JSONObject(d.workingJson).let { if(it.isNull("groupId")) d.sourceMessageId else it.getString("groupId") }
+    fun questions(d: TaskDraftEntity)=DraftQuestion.read(JSONObject(d.workingJson).optJSONArray("questions") ?: JSONArray())
+    fun pending(d: TaskDraftEntity): List<DraftQuestion> {
+        val b=bundle(d);val result=questions(d).toMutableList()
+        fun add(field: String,text: String) { if(result.none { it.field==field }) result.add(DraftQuestion(field,text)) }
+        if(b.task.title.isBlank()) add("TITLE","这件事叫什么？")
+        if(b.task.repeat!="NONE" && b.task.dueDate==null) add("DATE","请确定首次执行日期。")
+        if(intent(d) in setOf("NOTIFICATION","DEFAULT") && b.reminders.isEmpty()) add("REMINDER_TIME","希望哪天、几点通知你？")
+        return result
+    }
+    fun encode(b: TaskBundle,action: String,intent: String,decision: String,questions: List<DraftQuestion> = emptyList(),groupId: String?=null): String {
         val definitions=b.copy(reminders=b.reminders.map { it.copy(enabled=true,lastFiredLocal=null,scheduledAt=null,scheduledLocal=null,delivery="PENDING") })
-        return JSONObject().put("formatVersion",1).put("bundle",JsonCodec.bundle(definitions)).put("action",action)
-            .put("reminderIntent",intent).put("startDateDecision",decision).toString()
+        return JSONObject().put("formatVersion",2).put("bundle",JsonCodec.bundle(definitions)).put("action",action)
+            .put("reminderIntent",intent).put("startDateDecision",decision).put("questions",JSONArray(questions.map { it.json() }))
+            .put("groupId",groupId ?: JSONObject.NULL).toString()
     }
     fun sameDefinition(a: ReminderEntity,b: ReminderEntity)=a.localTime==b.localTime && a.repeat==b.repeat && a.relativeMinutes==b.relativeMinutes
     fun live(d: TaskDraftEntity,formal: TaskBundle?): TaskBundle {
@@ -28,16 +39,20 @@ object DraftContent {
         })
     }
     fun validatePartial(b: TaskBundle) {
-        Rules.validate(b.task.copy(title=b.task.title.ifBlank { "待补充事项" },dueTime=if(b.task.dueDate==null) null else b.task.dueTime),b.reminders)
+        RepeatRule.valueOf(b.task.repeat)
+        Rules.validate(b.task.copy(title=b.task.title.ifBlank { "待补充事项" },dueTime=if(b.task.dueDate==null) null else b.task.dueTime,
+            repeat=if(b.task.dueDate==null) "NONE" else b.task.repeat),b.reminders)
         b.task.dueTime?.let(java.time.LocalTime::parse)
     }
     fun ready(b: TaskBundle)=runCatching { Rules.validate(b.task,b.reminders) }.isSuccess
+    fun ready(d: TaskDraftEntity)=pending(d).isEmpty() && ready(bundle(d))
     fun operation(d: TaskDraftEntity,before: TaskBundle?): JSONObject {
         val b=bundle(d)
         val action=when(action(d)) { "UPSERT" -> if(d.targetKind=="NEW") "CREATE" else "UPDATE";else -> action(d) }
         return JSONObject().put("action",action).put("draftId",d.id).put("expectedRevision",d.revision)
             .put("expectedVersion",d.baseTaskVersion ?: JSONObject.NULL).put("needsStartDate",decision(d)=="UNDECIDED")
             .put("before",before?.let(JsonCodec::bundle) ?: JSONObject.NULL).put("bundle",JsonCodec.bundle(b))
+            .put("questions",JSONArray(pending(d).map { it.json() })).put("reminderIntent",intent(d)).put("ready",ready(d))
     }
     fun proposal(sourceId: String,changes: List<DraftChange>)=JSONObject().put("protocolVersion",2)
         .put("id",UUID.randomUUID().toString()).put("sourceId",sourceId)
@@ -55,7 +70,7 @@ object DraftEngine {
         return o.getJSONArray(key).objects()
     }
     fun normalize(raw: JSONObject,sourceId: String,context: ConversationContext,now: LocalDateTime=LocalDateTime.now()): List<DraftChange> {
-        checkKeys(raw,setOf("protocolVersion","reply","clarification","clarificationTarget","operations"))
+        checkKeys(raw,setOf("protocolVersion","reply","clarification","clarificationTarget","clarificationTargets","operations"))
         require(raw.opt("protocolVersion") is Number && raw.getInt("protocolVersion")==2) { "请使用支持增量操作的 v2 JSON 格式" }
         val ops=array(raw,"operations")
         require(ops.size<=10) { "一次最多处理 10 个事项" }
@@ -63,13 +78,17 @@ object DraftEngine {
             require(raw.opt("clarificationTarget") is String) { "追问目标格式不正确" }
             val ref=raw.getString("clarificationTarget")
             require(ref.isBlank() || context.targets.any { it.ref==ref }) { "追问目标不在本轮相关事项中" }
-            require(ops.isEmpty()) { "追问目标不能和执行操作同时返回" }
+            require(ops.all { it.optString("action")=="PATCH" }) { "追问只能补充草稿，不能同时完成或删除" }
         }
-        if(raw.optString("clarification").isNotBlank()) { require(ops.isEmpty()) { "存在歧义时不能同时返回操作" };return emptyList() }
-        require(!context.unresolvedQuote || ops.isEmpty()) { "引用消息尚未关联事项，请选择具体事项" }
+        if(raw.has("clarificationTargets")) {
+            val refs=raw.getJSONArray("clarificationTargets").strings()
+            require(refs.size<=10 && refs.distinct().size==refs.size && refs.all { ref -> context.targets.any { it.ref==ref } }) { "追问目标不在本轮相关事项中" }
+            require(ops.all { it.optString("action")=="PATCH" }) { "追问只能补充草稿" }
+        }
+        if(raw.optString("clarification").isNotBlank()) require(ops.all { it.optString("action")=="PATCH" }) { "追问只能补充草稿，不能同时完成或删除" }
         val seen=mutableSetOf<String>()
         return ops.map { op ->
-            checkKeys(op,setOf("target","action","fields","reminderPatch","startDateAdvice"))
+            checkKeys(op,setOf("target","action","fields","reminderPatch","startDateAdvice","questions","reminderPolicy"))
             val ref=op.getString("target")
             val action=op.getString("action")
             require(action in setOf("PATCH","COMPLETE","DELETE")) { "不支持的事项操作" }
@@ -84,7 +103,7 @@ object DraftEngine {
             if(action!="PATCH") require(previous?.status!="OPEN") { "请先确认或取消该事项尚未保存的修改" }
             val f=op.optJSONObject("fields") ?: JSONObject().also { require(!op.has("fields")) { "fields 必须是对象" } }
             checkKeys(f,fields)
-            if(action!="PATCH") require(f.length()==0 && !op.has("reminderPatch") && !op.has("startDateAdvice")) { "完成或删除不能同时修改字段" }
+            if(action!="PATCH") require(f.length()==0 && listOf("reminderPatch","startDateAdvice","questions","reminderPolicy").none(op::has)) { "完成或删除不能同时修改字段" }
             var t=old.task.copy(
                 title=if(f.has("title")) f.getString("title").trim() else old.task.title,
                 startDate=if(f.has("startDate")) f.nullString("startDate") else old.task.startDate,
@@ -109,9 +128,30 @@ object DraftEngine {
                 reminders=patchReminders(patch,t,reminders)
                 if(intent=="UNSPECIFIED") reminders=reminders.filterNot { it.origin=="AUTO" && it.lastFiredLocal==null }
                 intent="EXPLICIT"
-            } else if(action=="PATCH" && intent=="UNSPECIFIED" && (target==null || old.task.deadline()==null && t.deadline()!=null)) {
-                Rules.defaultReminder(t,now)?.let { candidate -> if(reminders.none { DraftContent.sameDefinition(it,candidate) }) reminders=reminders+candidate }
             }
+            val policy=if(op.has("reminderPolicy")) op.getString("reminderPolicy").also { require(it in setOf("NONE","NOTIFICATION","DEFAULT")) { "提醒意图不正确" } } else null
+            if(policy=="NONE") {
+                require(!op.has("reminderPatch") || op.getJSONObject("reminderPatch").optString("mode")=="CLEAR") { "不提醒不能同时添加通知" }
+                reminders=emptyList();intent="NONE"
+            } else if(policy!=null) {
+                require(!op.has("reminderPatch") || op.getJSONObject("reminderPatch").optString("mode")!="CLEAR") { "通知意图与清空提醒冲突" }
+                intent=policy
+                if(policy=="DEFAULT" && reminders.isEmpty()) reminders=listOfNotNull(Rules.defaultReminder(t,now))
+            } else if(op.optJSONObject("reminderPatch")?.optString("mode")=="CLEAR") intent="NONE"
+            if(intent=="DEFAULT" && reminders.isEmpty() && action=="PATCH") reminders=listOfNotNull(Rules.defaultReminder(t,now))
+            val supplied=if(op.has("questions")) DraftQuestion.read(op.getJSONArray("questions")) else emptyList()
+            fun resolved(q: DraftQuestion)=when(q.field) {
+                "TITLE" -> f.has("title") && t.title.isNotBlank()
+                "DATE" -> f.has("dueDate") && t.dueDate!=null
+                "REPEAT" -> f.has("repeat")
+                "REMINDER_TIME" -> intent=="NONE" || reminders.isNotEmpty() && (op.has("reminderPatch") || intent=="DEFAULT")
+                else -> op.has("questions") && f.length()>0
+            }
+            var questions=(previous?.takeIf { it.status=="OPEN" }?.let(DraftContent::questions).orEmpty().filterNot(::resolved)+supplied)
+                .associateBy { it.field }.values.toList()
+            if(intent=="NONE") questions=questions.filterNot { it.field=="REMINDER_TIME" }
+            // An all-day recurring todo needs an execution date, not a notification time.
+            if(intent=="NONE" && t.repeat!="NONE" && t.dueDate==null && questions.none { it.field=="DATE" }) t=t.copy(dueDate=now.toLocalDate().toString())
             if(op.has("startDateAdvice")) require(op.opt("startDateAdvice") is String && op.getString("startDateAdvice") in setOf("ASK","NONE")) { "开始日期建议格式不正确" }
             var decision=previous?.let(DraftContent::decision) ?: "NOT_NEEDED"
             if(f.has("startDate")) decision=if(t.startDate!=null) "DATE" else if(op.optString("startDateAdvice")=="ASK" && decision!="NONE") "UNDECIDED" else "NONE"
@@ -123,8 +163,11 @@ object DraftEngine {
             DraftContent.validatePartial(b)
             val d=TaskDraftEntity(id=previous?.id ?: UUID.randomUUID().toString(),targetTaskId=t.id,
                 targetKind=if(target?.formal==null) "NEW" else "SAVED",baseTaskVersion=target?.formal?.task?.version,
-                revision=(previous?.revision ?: 0)+1,workingJson=DraftContent.encode(b,if(action=="PATCH") "UPSERT" else action,intent,decision),sourceMessageId=sourceId)
+                revision=(previous?.revision ?: 0)+1,workingJson=DraftContent.encode(b,if(action=="PATCH") "UPSERT" else action,intent,decision,questions,
+                    previous?.let(DraftContent::group) ?: sourceId),sourceMessageId=sourceId)
             DraftChange(d,target?.formal)
+        }.also { changes ->
+            require(raw.optString("clarification").isBlank() || changes.isEmpty() || changes.any { !DraftContent.ready(it.draft) }) { "追问时请在对应草稿的 questions 中保留尚未确定的字段" }
         }
     }
     private fun definition(o: JSONObject,task: TaskEntity,old: ReminderEntity?=null): ReminderEntity {

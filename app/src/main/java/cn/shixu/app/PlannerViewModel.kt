@@ -41,6 +41,11 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
     var page by mutableIntStateOf(0)
     var selectedDate by mutableStateOf(LocalDate.now())
     var month by mutableStateOf(YearMonth.now())
+    fun changeMonth(offset: Long) {
+        val next=month.plusMonths(offset)
+        selectedDate=next.atDay(selectedDate.dayOfMonth.coerceAtMost(next.lengthOfMonth()))
+        month=next
+    }
     var detailsId by mutableStateOf<String?>(null)
     var editor by mutableStateOf<TaskBundle?>(null)
     var editorVersion by mutableStateOf<Int?>(null)
@@ -141,7 +146,6 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
                 repo.putMessage(current); source=current
                 draft=""; draftSharedText=""; draftImages=emptyList(); quoteId=null
                 val context=repo.conversationContext(current)
-                require(!context.unresolvedQuote) { "引用消息还没有关联明确事项，请选择待确认草稿，或从任务详情继续修改" }
                 val ocr=if(images.isNotEmpty()) try { Attachments.ocr(app,images) } catch(e: Exception) { if(p.vision) "" else throw IllegalStateException("本地图片识别失败，请尝试清晰截图或改用支持图片的模型") } else ""
                 require(images.isEmpty() || p.vision || ocr.isNotBlank()) { "图片中没有识别到文字，请补充说明或开启图片模型" }
                 val raw=ai.parse(p,key,current,context,images.map { Attachments.file(app,it) },ocr)
